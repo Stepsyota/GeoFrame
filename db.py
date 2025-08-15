@@ -11,7 +11,7 @@ class Owner(Base):
     user_id = Column(BigInteger, unique=True, nullable=False)
     full_name = Column(String, nullable=False)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-
+    media_path = Column(String, nullable=True)
     chats = relationship("Chat", back_populates="owner", cascade="all, delete-orphan")
 
 class Chat(Base):
@@ -57,7 +57,7 @@ def add_chat(chat_id, chat_title, owner_id, owner_name):
         new_chat = Chat(chat_id=chat_id, chat_title=chat_title, owner=owner)
         session.add(new_chat)
         session.commit()
-        return new_chat
+        return True
 
 def get_chats_by_owner(owner_id):
     with SessionLocal() as session:
@@ -65,3 +65,12 @@ def get_chats_by_owner(owner_id):
         if not owner:
             return []
         return owner.chats
+
+def set_owner_media_path(owner_id, path):
+    with SessionLocal() as session:
+        owner = session.query(Owner).filter_by(user_id=owner_id).first()
+        if not owner:
+            return False
+        owner.media_path = path
+        session.commit()
+        return True
