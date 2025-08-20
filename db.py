@@ -59,9 +59,9 @@ def add_chat(chat_id, chat_title, owner_id, owner_name):
         session.commit()
         return True
 
-def get_chats_by_owner(owner_id):
+def get_chats_by_owner(user_id):
     with SessionLocal() as session:
-        owner = session.query(Owner).filter_by(user_id=owner_id).first()
+        owner = session.query(Owner).filter_by(user_id=user_id).first()
         if not owner:
             return []
         return owner.chats
