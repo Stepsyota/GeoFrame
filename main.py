@@ -1,3 +1,4 @@
+from bot.handlers.basic import error_handler
 from config import TOKEN
 
 from telegram.ext import ApplicationBuilder
@@ -13,6 +14,7 @@ def main():
     logging.info("BOT STARTED")
     app = ApplicationBuilder().token(TOKEN).build()
     register_handlers(app)
+    app.add_error_handler(error_handler)
     app.run_polling()
 
 if __name__ == '__main__':
