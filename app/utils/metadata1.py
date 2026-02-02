@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from PIL import Image, ExifTags
+from PIL import Image
 import pillow_heif
 import ffmpeg
 from app.utils.hash import sha256_hash, phash_image
@@ -53,13 +53,11 @@ def extract_photo_meta(path : Path) -> dict:
             gps_lat = None
             gps_lon = None
             if exif:
-                for k, v in exif.items():
-                    print(ExifTags.TAGS[k], v)
                 dt = exif.get(306) # Key in exif dict for datetime
                 if dt:
                     taken_at = datetime.strptime(dt, "%Y:%m:%d %H:%M:%S")
 
-                gps_info = exif.get(34853) # Key in exif dict for gpsinfo
+                gps_info = exif.get(34853) # Key in exif dict for gps_info
                 if gps_info:
                     gps_lat, gps_lon = gps_to_decimal(gps_info)
 
@@ -80,13 +78,10 @@ def extract_video_meta(path : Path) -> dict:
     try:
         probe = ffmpeg.probe(path)
         video_stream = next(s for s in probe["streams"] if s["codec_type"] == "video")
-        for k, v in video_stream.items():
-            print(f"{k} : {v}")
 
         width = video_stream["width"]
         height = video_stream["height"]
-        print(type(video_stream["tags"]["creation_time"]))
-        taken_at = video_stream["tags"]["creation_time"]
+        taken_at = datetime.strptime(video_stream["tags"]["creation_time"], "%Y-%m-%dT%H:%M:%S.%fZ")
         gps_lat = None
         gps_lon = None
         duration = video_stream["duration"]
@@ -104,9 +99,6 @@ def extract_video_meta(path : Path) -> dict:
         return {}
 
 
-def gps_to_decimal(gps_info) -> tuple:
-    return None, None
-
 
 
 
@@ -115,9 +107,9 @@ from app.config import PHOTOS_DIR
 
 files = scan_directory(PHOTOS_DIR)
 #print(extract_common_meta(files[1]))
-#print(extract_video_meta(files[1]))
-# print(extract_common_meta(files[0]))
-print(extract_photo_meta(files[0]))
+print(extract_video_meta(files[1]))
+#print(extract_common_meta(files[0]))
+#print(extract_photo_meta(files[0]))
 
 
 
