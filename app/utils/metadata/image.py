@@ -1,6 +1,6 @@
 from datetime import datetime
 from pathlib import Path
-from PIL import Image
+from PIL import Image, ExifTags
 from app.utils.hash import phash_image
 from app.utils.gps import gps_to_decimal
 import pillow_heif
@@ -23,16 +23,17 @@ def extract_photo_meta(path : Path) -> dict:
                 if dt:
                     taken_at = datetime.strptime(dt, "%Y:%m:%d %H:%M:%S")
 
-                gps_info = exif.get(34853) # Key in exif dict for gps_info
+                gps_info = exif.get_ifd(ExifTags.IFD.GPSInfo) # Key in exif dict for gps_info
                 if gps_info:
                     gps_lat, gps_lon = gps_to_decimal(gps_info)
-
+                    altitude = gps_info[6]
             return {
                 "width" : width,
                 "height": height,
                 "taken_at" : taken_at,
                 "gps_lat" : gps_lat,
                 "gps_lon" : gps_lon,
+                "altitude" : altitude,
                 "phash" : phash
             }
 
