@@ -1,4 +1,5 @@
-from sqlalchemy import Column, Integer, String, BIGINT, Double, DATETIME, CHAR, Enum, UniqueConstraint, ForeignKey
+from sqlalchemy import Column, Integer, String, BIGINT, Double, CHAR, Enum, UniqueConstraint, ForeignKey, \
+    TIMESTAMP, LargeBinary
 from sqlalchemy.orm import DeclarativeBase, relationship
 import enum
 
@@ -17,8 +18,8 @@ class MediaFile(Base):
     path = Column(String, index=True, nullable=False)
     filename = Column(String, index=True, nullable=False)
     size_bytes = Column(BIGINT, nullable=False)
-    created_at_fs = Column(DATETIME, nullable=False)
-    taken_at = Column(DATETIME, nullable=True)
+    created_at_fs = Column(TIMESTAMP(timezone=True), nullable=False)
+    taken_at = Column(TIMESTAMP(timezone=True), nullable=True)
     sha256 = Column(CHAR(64), unique=True, nullable=False)
     width = Column(Integer, nullable=False)
     height = Column(Integer, nullable=False)
@@ -41,7 +42,7 @@ class MediaFile(Base):
     )
 
     __table_args__ = (
-        UniqueConstraint("path", "filename", name= "unique_path_filename")
+        UniqueConstraint("path", "filename", name= "unique_path_filename"),
     )
 
 class MediaImage(Base):
@@ -52,7 +53,7 @@ class MediaImage(Base):
         ForeignKey("media_files.id", ondelete="CASCADE"),
         primary_key=True
     )
-    phash = Column(BIGINT, index=True, nullable=False)
+    phash = Column(LargeBinary(8), index=True, nullable=False)
 
     media = relationship("MediaFile", back_populates="image")
 
@@ -94,5 +95,5 @@ class MediaLivePhoto(Base):
     )
 
     __table_args__ = (
-        UniqueConstraint("image_media_id", "video_media_id", name= "unique_live_photo_pair")
+        UniqueConstraint("image_media_id", "video_media_id", name= "unique_live_photo_pair"),
     )
