@@ -16,6 +16,7 @@ class MediaMetadata:
     taken_at: datetime | None = None
     gps_lat : float | None = None
     gps_lon : float | None = None
+    altitude : float | None = None
 
     # IMAGE
     phash : int | None = None
