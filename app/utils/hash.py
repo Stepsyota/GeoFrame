@@ -17,11 +17,12 @@ def sha256_hash(path : Path, algo="sha256") -> str:
             h.update(chunk)
     return h.hexdigest()
 
-def phash_image(path : Path) -> int | None:
+def phash_image(path : Path) -> bytes | None:
     try:
         with Image.open(path) as img:
             h = imagehash.phash(img)
-            return int(str(h), 16)
+            phash_bytes = int(str(h), 16).to_bytes(8, "big")
+            return phash_bytes
     except Exception as e:
         print(f"PHASH SKIP {path}: {e}")
         return None
