@@ -19,7 +19,7 @@ class MediaMetadata:
     altitude : float | None = None
 
     # IMAGE
-    phash : int | None = None
+    phash : bytes | None = None
 
     # VIDEO
     duration : float | None = None
