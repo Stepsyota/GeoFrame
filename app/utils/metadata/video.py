@@ -13,7 +13,7 @@ def extract_video_meta(path : Path) -> dict:
         taken_at = datetime.strptime(video_stream["tags"]["creation_time"], "%Y-%m-%dT%H:%M:%S.%fZ")
         gps_lat = None
         gps_lon = None
-        duration = video_stream["duration"]
+        duration = float(video_stream["duration"])
         return {
             "width": width,
             "height": height,
