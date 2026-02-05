@@ -84,12 +84,12 @@ class MediaLivePhoto(Base):
         Integer, ForeignKey("media_files.id"), nullable=False
     )
 
-    image = relationship(
+    image_media_file = relationship(
         "MediaFile",
         foreign_keys=[image_media_id]
     )
 
-    video = relationship(
+    video_media_file = relationship(
         "MediaFile",
         foreign_keys=[video_media_id]
     )
