@@ -2,7 +2,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
-from app.db.tables import MediaFile, MediaType, MediaImage, MediaVideo, MediaLivePhoto
+from app.db.tables_media import MediaFile, MediaType, MediaImage, MediaVideo, MediaLivePhoto
 from app.utils.metadata.models import MediaMetadata
 
 
@@ -54,7 +54,7 @@ async def get_mediafiles(session : AsyncSession) -> list[MediaFile]:
     )
     return result.scalars().all()
 
-    
+
 #MediaLivePhoto
 async def create_live_photo(session : AsyncSession, image_id : int, video_id : int):
     live_photo = MediaLivePhoto(image_media_id=image_id, video_media_id=video_id)

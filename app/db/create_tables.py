@@ -1,5 +1,5 @@
 import asyncio
-from app.db.tables import Base
+from app.db.tables_media import Base
 from app.db.database import engine
 
 
