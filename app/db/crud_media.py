@@ -54,7 +54,7 @@ async def get_mediafiles(session : AsyncSession) -> list[MediaFile]:
     )
     return result.scalars().all()
 
-
+    
 #MediaLivePhoto
 async def create_live_photo(session : AsyncSession, image_id : int, video_id : int):
     live_photo = MediaLivePhoto(image_media_id=image_id, video_media_id=video_id)
