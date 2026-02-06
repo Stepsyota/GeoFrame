@@ -1,11 +1,9 @@
 from sqlalchemy import Column, Integer, String, BIGINT, Double, CHAR, Enum, UniqueConstraint, ForeignKey, \
     TIMESTAMP, LargeBinary
-from sqlalchemy.orm import DeclarativeBase, relationship
+from sqlalchemy.orm import relationship
 import enum
+from app.db.tables_common import Base
 
-
-class Base(DeclarativeBase):
-    pass
 
 class MediaType(enum.Enum):
     image = "image"
