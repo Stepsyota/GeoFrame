@@ -1,6 +1,6 @@
 import pytest
 from app.db.crud_media import create_mediafile, get_mediafile
-from tests.factories import image_metadata
+from tests.crud_media.factories import image_metadata
 from app.db.tables_media import MediaType
 
 

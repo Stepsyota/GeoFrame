@@ -1,7 +1,7 @@
 import pytest
 from sqlalchemy.exc import IntegrityError
 from app.db.crud_media import create_mediafile, get_mediafile, get_mediafiles
-from tests.factories import image_metadata, video_metadata, base_metadata
+from tests.crud_media.factories import image_metadata, video_metadata, base_metadata
 from app.db.tables_media import MediaFile
 
 

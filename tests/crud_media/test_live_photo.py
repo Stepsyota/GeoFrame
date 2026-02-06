@@ -1,6 +1,6 @@
 import pytest
 from app.db.crud_media import create_mediafile, create_live_photo, get_live_photo
-from tests.factories import image_metadata, video_metadata
+from tests.crud_media.factories import image_metadata, video_metadata
 
 
 @pytest.mark.asyncio
