@@ -10,6 +10,7 @@ Photos/
 
 #txt file
 *.txt
+!requirements.txt
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
