@@ -36,6 +36,12 @@ async def create_mediafile(session : AsyncSession, metadata : MediaMetadata) -> 
     await session.refresh(media, ["image", "video"])
     return media
 
+async def delete_mediafile(session : AsyncSession, id : int) -> MediaFile:
+    media = await get_mediafile(session, id)
+    if media:
+        await session.delete(media)
+        await session.flush()
+    return media
 
 async def get_mediafile(session : AsyncSession, id : int) -> MediaFile:
     result = await session.execute(
