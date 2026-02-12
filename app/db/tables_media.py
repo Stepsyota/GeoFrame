@@ -13,8 +13,7 @@ class MediaFile(Base):
     __tablename__ = "media_files"
 
     id = Column(Integer, primary_key=True)
-    path = Column(String, index=True, nullable=False)
-    filename = Column(String, index=True, nullable=False)
+    storage_path = Column(String, index=True, nullable=False)
     size_bytes = Column(BIGINT, nullable=False)
     created_at_fs = Column(TIMESTAMP(timezone=True), nullable=False)
     taken_at = Column(TIMESTAMP(timezone=True), nullable=True)
@@ -40,7 +39,7 @@ class MediaFile(Base):
     )
 
     __table_args__ = (
-        UniqueConstraint("path", "filename", name= "unique_path_filename"),
+        UniqueConstraint("storage_path", name= "unique_storage_path"),
     )
 
 class MediaImage(Base):

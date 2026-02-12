@@ -2,15 +2,14 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
-from app.db.tables_media import MediaFile, MediaType, MediaImage, MediaVideo, MediaLivePhoto
+from app.db.tables_media import MediaFile, MediaLivePhoto
 from app.utils.metadata.models import MediaMetadata
 
 
 # MediaFile
 async def create_mediafile(session : AsyncSession, metadata : MediaMetadata) -> MediaFile:
     media = MediaFile(
-        path=str(metadata.path.parent),
-        filename=metadata.filename,
+        storage_path=str(metadata.storage_path),
         size_bytes=metadata.size_bytes,
         created_at_fs=metadata.created_at_fs,
         taken_at=metadata.taken_at,
@@ -20,16 +19,8 @@ async def create_mediafile(session : AsyncSession, metadata : MediaMetadata) -> 
         gps_lat=metadata.gps_lat,
         gps_lon=metadata.gps_lon,
         altitude=metadata.altitude,
+        media_type=metadata.media_type
     )
-
-    if metadata.phash is not None:
-        media.image = MediaImage(phash=metadata.phash)
-        media.media_type = MediaType.image
-    elif metadata.duration is not None:
-        media.video = MediaVideo(duration=metadata.duration)
-        media.media_type = MediaType.video
-    else:
-        raise ValueError("Cannot determine media type: no phash and no duration")
 
     session.add(media)
     await session.flush()
