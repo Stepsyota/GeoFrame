@@ -11,6 +11,16 @@ from pathlib import Path
 async def add_file_to_db(file : Path):
     async with async_session_factory() as session:
         async with session.begin():
+
+
+            # if metadata.phash is not None:
+            #     media.image = MediaImage(phash=metadata.phash)
+            #     media.media_type = MediaType.image
+            # elif metadata.duration is not None:
+            #     media.video = MediaVideo(duration=metadata.duration)
+            #     media.media_type = MediaType.video
+            # else:
+            #     raise ValueError("Cannot determine media type: no phash and no duration")
             await create_mediafile(session, extract_meta(file))
 
 async def add_files_to_db():
