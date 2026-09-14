@@ -1,0 +1,27 @@
+#pragma once
+
+#include "core/asset_repository.hpp"
+#include "db/database.hpp"
+
+namespace geoframe::db {
+
+/**
+ * @brief SQLite-реализация хранилища медиафайлов.
+ */
+class SqliteAssetRepository : public core::IAssetRepository {
+public:
+    explicit SqliteAssetRepository(Database& database);
+
+    core::Asset create(const core::NewAsset& asset) override;
+    std::optional<core::Asset> find_by_id(std::int64_t id) override;
+    std::optional<core::Asset> find_by_source_path(
+        const std::filesystem::path& source_path) override;
+    std::vector<core::Asset> list(std::size_t limit, std::size_t offset) override;
+    void set_favorite(std::int64_t id, bool favorite) override;
+    void set_status(std::int64_t id, core::AssetStatus status) override;
+
+private:
+    Database& database;
+};
+
+}  // namespace geoframe::db

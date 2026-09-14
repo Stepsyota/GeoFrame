@@ -1,0 +1,22 @@
+#pragma once
+
+#include <array>
+#include <string_view>
+
+namespace geoframe::db {
+
+struct Migration {
+    int version;
+    std::string_view sql;
+};
+
+inline constexpr std::array migrations{
+    Migration{
+        1,
+        R"GEFRAME_SQL(
+@GEOFRAME_MIGRATION_001@
+)GEFRAME_SQL",
+    },
+};
+
+}  // namespace geoframe::db

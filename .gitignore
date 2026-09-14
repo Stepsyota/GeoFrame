@@ -8,10 +8,6 @@ Photos/
 # Created by .ignore support plugin (hsz.mobi)
 ### Python template
 
-#txt file
-*.txt
-!requirements.txt
-
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -102,16 +98,8 @@ ENV/
 # Rope project settings
 .ropeproject
 ### VirtualEnv template
-# Virtualenv
-# http://iamzed.com/2009/05/07/a-primer-on-virtualenv/
-[Bb]in
-[Ii]nclude
-[Ll]ib
-[Ll]ib64
-[Ll]ocal
-[Ss]cripts
 pyvenv.cfg
-.venv
+.venv/
 pip-selfcheck.json
 
 ### JetBrains template

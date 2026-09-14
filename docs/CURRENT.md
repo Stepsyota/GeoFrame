@@ -90,8 +90,8 @@ Python-код не развиваем. Используем как reference п�
 
 #### Инфраструктура
 
-- [ ] Один бинарник `geoframe` (modular monolith)
-- [ ] SQLite для метаданных (встроенная, self-bootstrap)
+- [x] Один бинарник `geoframe` (modular monolith)
+- [x] SQLite для метаданных (встроенная, self-bootstrap)
 - [ ] HTTPS (self-signed cert при первом запуске)
 - [ ] Локальная сеть (LAN)
 - [ ] CLI (`geoframe serve`, `geoframe scan`, ...)
@@ -178,8 +178,8 @@ GeoFrame читает source folder. Внешние изменения файл�
 ## Следующие шаги (порядок работ)
 
 1. **Документация** — vision, MVP, roadmap, architecture ✅
-2. **CMake skeleton** — модули, GTest, partial CI
-3. **SQLite** — schema, migrations, Asset repository
+2. **CMake skeleton** — модули, GTest, partial CI ✅
+3. **SQLite** — schema, migrations, Asset repository ✅
 4. **Scanner + job queue** — directory walk, worker thread pool
 5. **Media engine** — hash, EXIF, thumbnails (ffmpeg)
 6. **HTTP API** — REST + WebSocket + TLS
