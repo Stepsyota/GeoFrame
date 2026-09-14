@@ -95,7 +95,8 @@ bool Statement::column_is_null(const int index) const {
 
 Database::Database(const std::filesystem::path& path) {
     const std::string filename = path.string();
-    if (sqlite3_open(filename.c_str(), &connection) != SQLITE_OK) {
+    constexpr int flags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_FULLMUTEX;
+    if (sqlite3_open_v2(filename.c_str(), &connection, flags, nullptr) != SQLITE_OK) {
         const std::string error = connection == nullptr ? "unknown error" : sqlite3_errmsg(connection);
         sqlite3_close(connection);
         connection = nullptr;
@@ -139,10 +140,6 @@ void Database::execute(const std::string_view sql) {
 
 Statement Database::prepare(const std::string_view sql) {
     return Statement{connection, sql};
-}
-
-std::int64_t Database::last_insert_id() const {
-    return sqlite3_last_insert_rowid(connection);
 }
 
 int Database::changes() const {

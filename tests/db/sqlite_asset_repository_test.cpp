@@ -44,7 +44,7 @@ protected:
 TEST_F(SqliteAssetRepositoryTest, MigrationIsIdempotent) {
     MigrationRunner{database}.migrate();
 
-    EXPECT_EQ(database.user_version(), 2);
+    EXPECT_EQ(database.user_version(), 3);
 }
 
 TEST_F(SqliteAssetRepositoryTest, CreatesAndFindsAsset) {
@@ -109,6 +109,13 @@ TEST_F(SqliteAssetRepositoryTest, RejectsDuplicateSourcePath) {
     auto duplicate = image();
     duplicate.sha256 = std::string(64, 'b');
     EXPECT_THROW(repository.create(duplicate), std::runtime_error);
+}
+
+TEST_F(SqliteAssetRepositoryTest, AllowsDuplicateHash) {
+    repository.create(image());
+    auto duplicate = image("/library/IMG_0002.HEIC");
+
+    EXPECT_NO_THROW(repository.create(duplicate));
 }
 
 }  // namespace geoframe::db

@@ -8,6 +8,7 @@ endif()
 
 file(READ "${PROJECT_SOURCE_DIR}/migrations/001_initial.sql" GEOFRAME_MIGRATION_001)
 file(READ "${PROJECT_SOURCE_DIR}/migrations/002_jobs.sql" GEOFRAME_MIGRATION_002)
+file(READ "${PROJECT_SOURCE_DIR}/migrations/003_allow_duplicate_hashes.sql" GEOFRAME_MIGRATION_003)
 configure_file(
     "${PROJECT_SOURCE_DIR}/cmake/migrations.hpp.in"
     "${CMAKE_CURRENT_BINARY_DIR}/generated/db/migrations.hpp"

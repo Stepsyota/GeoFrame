@@ -1,5 +1,7 @@
 #include "db/sqlite_asset_repository.hpp"
 
+#include <algorithm>
+#include <cctype>
 #include <limits>
 #include <stdexcept>
 #include <string_view>
@@ -125,39 +127,45 @@ core::Asset SqliteAssetRepository::create(const core::NewAsset& asset) {
         throw std::invalid_argument("Asset size exceeds SQLite integer range");
     }
 
-    auto statement = database.prepare(
-        "INSERT INTO assets ("
-        "source_path, original_filename, media_type, size_bytes, sha256, captured_at, "
-        "width, height, gps_lat, gps_lon, altitude, camera"
-        ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    std::int64_t asset_id = 0;
+    {
+        auto statement = database.prepare(
+            "INSERT INTO assets ("
+            "source_path, original_filename, media_type, size_bytes, sha256, captured_at, "
+            "width, height, gps_lat, gps_lon, altitude, camera"
+            ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id");
 
-    statement.bind(1, asset.source_path.string());
-    statement.bind(2, asset.original_filename);
-    statement.bind(3, to_string(asset.media_type));
-    statement.bind(4, static_cast<std::int64_t>(asset.size_bytes));
-    bind_optional(statement, 5, asset.sha256);
-    bind_optional(statement, 6, asset.captured_at);
-    bind_optional(statement, 7, asset.width);
-    bind_optional(statement, 8, asset.height);
+        statement.bind(1, asset.source_path.string());
+        statement.bind(2, asset.original_filename);
+        statement.bind(3, to_string(asset.media_type));
+        statement.bind(4, static_cast<std::int64_t>(asset.size_bytes));
+        bind_optional(statement, 5, asset.sha256);
+        bind_optional(statement, 6, asset.captured_at);
+        bind_optional(statement, 7, asset.width);
+        bind_optional(statement, 8, asset.height);
 
-    if (asset.location.has_value()) {
-        statement.bind(9, asset.location->latitude);
-        statement.bind(10, asset.location->longitude);
-        if (asset.location->altitude.has_value()) {
-            statement.bind(11, *asset.location->altitude);
+        if (asset.location.has_value()) {
+            statement.bind(9, asset.location->latitude);
+            statement.bind(10, asset.location->longitude);
+            if (asset.location->altitude.has_value()) {
+                statement.bind(11, *asset.location->altitude);
+            } else {
+                statement.bind_null(11);
+            }
         } else {
+            statement.bind_null(9);
+            statement.bind_null(10);
             statement.bind_null(11);
         }
-    } else {
-        statement.bind_null(9);
-        statement.bind_null(10);
-        statement.bind_null(11);
+
+        bind_optional(statement, 12, asset.camera);
+        if (!statement.step()) {
+            throw std::runtime_error("SQLite did not return created asset id");
+        }
+        asset_id = statement.column_int64(0);
     }
 
-    bind_optional(statement, 12, asset.camera);
-    statement.step();
-
-    auto created = find_by_id(database.last_insert_id());
+    auto created = find_by_id(asset_id);
     if (!created.has_value()) {
         throw std::runtime_error("Created asset was not found");
     }
@@ -205,22 +213,36 @@ std::vector<core::Asset> SqliteAssetRepository::list(const std::size_t limit,
     return assets;
 }
 
+void SqliteAssetRepository::set_sha256(const std::int64_t id, const std::string_view sha256) {
+    const bool is_hex = std::ranges::all_of(
+        sha256, [](const unsigned char value) { return std::isxdigit(value) != 0; });
+    if (sha256.size() != 64 || !is_hex) {
+        throw std::invalid_argument("SHA-256 must contain 64 hexadecimal characters");
+    }
+
+    auto statement = database.prepare("UPDATE assets SET sha256 = ? WHERE id = ? RETURNING id");
+    statement.bind(1, sha256);
+    statement.bind(2, id);
+    if (!statement.step()) {
+        throw std::out_of_range("Asset not found");
+    }
+}
+
 void SqliteAssetRepository::set_favorite(const std::int64_t id, const bool favorite) {
-    auto statement = database.prepare("UPDATE assets SET favorite = ? WHERE id = ?");
+    auto statement =
+        database.prepare("UPDATE assets SET favorite = ? WHERE id = ? RETURNING id");
     statement.bind(1, static_cast<std::int64_t>(favorite));
     statement.bind(2, id);
-    statement.step();
-    if (database.changes() == 0) {
+    if (!statement.step()) {
         throw std::out_of_range("Asset not found");
     }
 }
 
 void SqliteAssetRepository::set_status(const std::int64_t id, const core::AssetStatus status) {
-    auto statement = database.prepare("UPDATE assets SET status = ? WHERE id = ?");
+    auto statement = database.prepare("UPDATE assets SET status = ? WHERE id = ? RETURNING id");
     statement.bind(1, to_string(status));
     statement.bind(2, id);
-    statement.step();
-    if (database.changes() == 0) {
+    if (!statement.step()) {
         throw std::out_of_range("Asset not found");
     }
 }

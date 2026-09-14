@@ -34,7 +34,17 @@ geoframe_set_warnings(geoframe_storage_tests)
 
 gtest_discover_tests(geoframe_storage_tests)
 
-add_executable(geoframe_worker_tests worker/scan_service_test.cpp)
+add_executable(geoframe_media_tests media/sha256_test.cpp)
+target_link_libraries(geoframe_media_tests PRIVATE GeoFrame::media GTest::gtest_main)
+geoframe_set_warnings(geoframe_media_tests)
+
+gtest_discover_tests(geoframe_media_tests)
+
+add_executable(
+    geoframe_worker_tests
+    worker/scan_service_test.cpp
+    worker/worker_pool_test.cpp
+)
 target_link_libraries(
     geoframe_worker_tests
     PRIVATE

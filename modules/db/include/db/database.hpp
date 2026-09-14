@@ -59,7 +59,6 @@ public:
 
     void execute(std::string_view sql);
     [[nodiscard]] Statement prepare(std::string_view sql);
-    [[nodiscard]] std::int64_t last_insert_id() const;
     [[nodiscard]] int changes() const;
     [[nodiscard]] int user_version();
 

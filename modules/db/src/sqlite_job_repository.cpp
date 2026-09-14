@@ -78,12 +78,6 @@ core::Job read_job(const Statement& statement) {
     return job;
 }
 
-void ensure_job_changed(Database& database) {
-    if (database.changes() == 0) {
-        throw std::out_of_range("Job not found or has unexpected status");
-    }
-}
-
 }  // namespace
 
 SqliteJobRepository::SqliteJobRepository(Database& database) : database(database) {}
@@ -94,6 +88,16 @@ void SqliteJobRepository::enqueue(const std::int64_t asset_id, const core::JobTy
     statement.bind(1, asset_id);
     statement.bind(2, to_string(type));
     statement.step();
+}
+
+std::optional<core::Job> SqliteJobRepository::find_by_id(const std::int64_t id) {
+    auto statement = database.prepare(
+        "SELECT id, asset_id, type, status, attempts, error FROM jobs WHERE id = ?");
+    statement.bind(1, id);
+    if (!statement.step()) {
+        return std::nullopt;
+    }
+    return read_job(statement);
 }
 
 std::optional<core::Job> SqliteJobRepository::claim_next() {
@@ -113,20 +117,22 @@ std::optional<core::Job> SqliteJobRepository::claim_next() {
 void SqliteJobRepository::mark_done(const std::int64_t id) {
     auto statement = database.prepare(
         "UPDATE jobs SET status = 'done', completed_at = CURRENT_TIMESTAMP, error = NULL "
-        "WHERE id = ? AND status = 'processing'");
+        "WHERE id = ? AND status = 'processing' RETURNING id");
     statement.bind(1, id);
-    statement.step();
-    ensure_job_changed(database);
+    if (!statement.step()) {
+        throw std::out_of_range("Job not found or has unexpected status");
+    }
 }
 
 void SqliteJobRepository::mark_failed(const std::int64_t id, const std::string_view error) {
     auto statement = database.prepare(
         "UPDATE jobs SET status = 'failed', completed_at = CURRENT_TIMESTAMP, error = ? "
-        "WHERE id = ? AND status = 'processing'");
+        "WHERE id = ? AND status = 'processing' RETURNING id");
     statement.bind(1, error);
     statement.bind(2, id);
-    statement.step();
-    ensure_job_changed(database);
+    if (!statement.step()) {
+        throw std::out_of_range("Job not found or has unexpected status");
+    }
 }
 
 int SqliteJobRepository::recover_interrupted() {
