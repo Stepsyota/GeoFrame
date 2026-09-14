@@ -6,6 +6,7 @@
 #include "db/sqlite_job_repository.hpp"
 #include "worker/hash_job_handler.hpp"
 #include "worker/job_dispatcher.hpp"
+#include "worker/preview_job_handler.hpp"
 #include "worker/worker_pool.hpp"
 
 #include <gtest/gtest.h>
@@ -127,6 +128,45 @@ TEST_F(WorkerPoolTest, MarksJobFailedWhenFileIsMissing) {
     pool.rethrow_if_failed();
     ASSERT_TRUE(job.error.has_value());
     EXPECT_NE(job.error->find("Cannot open file"), std::string::npos);
+}
+
+TEST_F(WorkerPoolTest, RunsImagePipelineThroughPreview) {
+    const auto job_id = enqueue_hash_job(true);
+    std::ofstream{source} << "P3\n2 1\n255\n255 0 0 0 255 0\n";
+    const auto cache = std::filesystem::path{source.string() + "-cache"};
+    CountingMetadataHandler metadata_handler;
+    PreviewJobHandler thumbnail_handler{assets, core::JobType::Thumbnail, cache / "thumbnails", 1};
+    PreviewJobHandler preview_handler{assets, core::JobType::Preview, cache / "previews", 2};
+    JobDispatcher dispatcher{
+        assets,
+        jobs,
+        {&handler, &metadata_handler, &thumbnail_handler, &preview_handler},
+    };
+    WorkerPool pool{jobs, dispatcher, 1};
+
+    pool.start();
+    wait_for_status(job_id, core::JobStatus::Done);
+
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds{5};
+    std::optional<core::Asset> processed;
+    while (std::chrono::steady_clock::now() < deadline) {
+        processed = assets.find_by_source_path(source);
+        if (processed.has_value() && processed->preview_path.has_value()) {
+            break;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds{10});
+    }
+    pool.stop();
+
+    pool.rethrow_if_failed();
+    ASSERT_TRUE(processed.has_value());
+    ASSERT_TRUE(processed->thumbnail_path.has_value());
+    ASSERT_TRUE(processed->preview_path.has_value());
+    EXPECT_TRUE(std::filesystem::is_regular_file(*processed->thumbnail_path));
+    EXPECT_TRUE(std::filesystem::is_regular_file(*processed->preview_path));
+
+    std::error_code error;
+    std::filesystem::remove_all(cache, error);
 }
 
 TEST_F(WorkerPoolTest, RejectsEmptyPool) {

@@ -44,7 +44,7 @@ protected:
 TEST_F(SqliteAssetRepositoryTest, MigrationIsIdempotent) {
     MigrationRunner{database}.migrate();
 
-    EXPECT_EQ(database.user_version(), 3);
+    EXPECT_EQ(database.user_version(), 4);
 }
 
 TEST_F(SqliteAssetRepositoryTest, CreatesAndFindsAsset) {
@@ -123,6 +123,18 @@ TEST_F(SqliteAssetRepositoryTest, UpdatesNormalizedMetadata) {
     EXPECT_EQ(updated->width, 1920);
     EXPECT_EQ(updated->height, 1080);
     EXPECT_EQ(updated->camera, "Test camera");
+}
+
+TEST_F(SqliteAssetRepositoryTest, UpdatesGeneratedImagePaths) {
+    const auto created = repository.create(image());
+
+    repository.set_thumbnail_path(created.id, "/cache/thumbnails/1.jpg");
+    repository.set_preview_path(created.id, "/cache/previews/1.jpg");
+
+    const auto updated = repository.find_by_id(created.id);
+    ASSERT_TRUE(updated.has_value());
+    EXPECT_EQ(updated->thumbnail_path, "/cache/thumbnails/1.jpg");
+    EXPECT_EQ(updated->preview_path, "/cache/previews/1.jpg");
 }
 
 TEST_F(SqliteAssetRepositoryTest, RejectsRelativeSourcePath) {

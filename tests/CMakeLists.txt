@@ -37,6 +37,7 @@ gtest_discover_tests(geoframe_storage_tests)
 add_executable(
     geoframe_media_tests
     media/metadata_extractor_test.cpp
+    media/preview_generator_test.cpp
     media/sha256_test.cpp
 )
 target_link_libraries(geoframe_media_tests PRIVATE GeoFrame::media GTest::gtest_main)

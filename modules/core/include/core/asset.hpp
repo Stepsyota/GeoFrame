@@ -54,6 +54,8 @@ struct Asset : NewAsset {
     std::int64_t id;
     AssetStatus status = AssetStatus::Active;
     bool favorite = false;
+    std::optional<std::filesystem::path> thumbnail_path;
+    std::optional<std::filesystem::path> preview_path;
 };
 
 }  // namespace geoframe::core

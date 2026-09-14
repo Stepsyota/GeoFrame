@@ -12,7 +12,8 @@ namespace {
 
 constexpr std::string_view kAssetColumns =
     "id, source_path, original_filename, media_type, status, size_bytes, sha256, "
-    "captured_at, width, height, gps_lat, gps_lon, altitude, camera, favorite";
+    "captured_at, width, height, gps_lat, gps_lon, altitude, camera, favorite, "
+    "thumbnail_path, preview_path";
 
 std::string_view to_string(const core::MediaType type) {
     switch (type) {
@@ -112,6 +113,12 @@ core::Asset read_asset(const Statement& statement) {
 
     asset.camera = optional_text(statement, 13);
     asset.favorite = statement.column_int64(14) != 0;
+    if (!statement.column_is_null(15)) {
+        asset.thumbnail_path = statement.column_text(15);
+    }
+    if (!statement.column_is_null(16)) {
+        asset.preview_path = statement.column_text(16);
+    }
     return asset;
 }
 
@@ -253,6 +260,34 @@ void SqliteAssetRepository::set_metadata(const std::int64_t id,
 
     bind_optional(statement, 7, metadata.camera);
     statement.bind(8, id);
+    if (!statement.step()) {
+        throw std::out_of_range("Asset not found");
+    }
+}
+
+void SqliteAssetRepository::set_thumbnail_path(const std::int64_t id,
+                                               const std::filesystem::path& path) {
+    if (!path.is_absolute()) {
+        throw std::invalid_argument("Thumbnail path must be absolute");
+    }
+    auto statement =
+        database.prepare("UPDATE assets SET thumbnail_path = ? WHERE id = ? RETURNING id");
+    statement.bind(1, path.string());
+    statement.bind(2, id);
+    if (!statement.step()) {
+        throw std::out_of_range("Asset not found");
+    }
+}
+
+void SqliteAssetRepository::set_preview_path(const std::int64_t id,
+                                             const std::filesystem::path& path) {
+    if (!path.is_absolute()) {
+        throw std::invalid_argument("Preview path must be absolute");
+    }
+    auto statement =
+        database.prepare("UPDATE assets SET preview_path = ? WHERE id = ? RETURNING id");
+    statement.bind(1, path.string());
+    statement.bind(2, id);
     if (!statement.step()) {
         throw std::out_of_range("Asset not found");
     }

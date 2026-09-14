@@ -65,7 +65,7 @@ Python-код не развиваем. Используем как reference п�
 - [x] Дата съёмки изображения из EXIF; если нет — `unknown` (не fallback на filesystem)
 - [x] SHA-256 каждого оригинала
 - [ ] Нормализованные метаданные + raw metadata dump
-- [ ] Thumbnail (300–500 px) и Preview (1600–2500 px)
+- [x] Thumbnail и Preview изображений с настраиваемым max size
 
 #### Медиа
 
@@ -182,7 +182,7 @@ GeoFrame читает source folder. Внешние изменения файл�
 3. **SQLite** — schema, migrations, Asset repository ✅
 4. **Scanner + persistent job queue** — directory walk, restart-safe jobs ✅
 5. **Worker pool + SHA-256 + image EXIF** — OpenSSL, Exiv2 ✅
-6. **Preview generation** — thumbnails и previews через ffmpeg
+6. **Preview generation** — thumbnails и previews через ffmpeg ✅
 7. **HTTP API** — REST + WebSocket + TLS
 8. **React gallery** — минимальный UI
 9. **Map** — GeoJSON endpoint + MapLibre

@@ -1,5 +1,6 @@
 #include "worker/job_dispatcher.hpp"
 
+#include <optional>
 #include <stdexcept>
 
 namespace geoframe::worker {
@@ -34,16 +35,27 @@ IJobHandler* JobDispatcher::find_handler(const core::JobType type) const {
 }
 
 void JobDispatcher::enqueue_next(const core::Job& completed_job) {
-    if (completed_job.type != core::JobType::Hash) {
+    std::optional<core::JobType> next_type;
+    if (completed_job.type == core::JobType::Metadata) {
+        next_type = core::JobType::Thumbnail;
+    } else if (completed_job.type == core::JobType::Thumbnail) {
+        next_type = core::JobType::Preview;
+    } else if (completed_job.type != core::JobType::Hash) {
         return;
     }
 
-    const auto asset = assets.find_by_id(completed_job.asset_id);
-    if (!asset.has_value()) {
-        throw std::out_of_range("Asset disappeared after job processing");
+    if (completed_job.type == core::JobType::Hash) {
+        const auto asset = assets.find_by_id(completed_job.asset_id);
+        if (!asset.has_value()) {
+            throw std::out_of_range("Asset disappeared after job processing");
+        }
+        if (asset->media_type == core::MediaType::Image) {
+            next_type = core::JobType::Metadata;
+        }
     }
-    if (asset->media_type == core::MediaType::Image) {
-        jobs.enqueue(asset->id, core::JobType::Metadata);
+
+    if (next_type.has_value() && find_handler(*next_type) != nullptr) {
+        jobs.enqueue(completed_job.asset_id, *next_type);
     }
 }
 

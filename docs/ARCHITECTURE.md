@@ -392,6 +392,7 @@ preview_max_px = 2000
 | GTest | FetchContent |
 | OpenSSL | system package |
 | Exiv2 | system package; pinned FetchContent fallback |
+| reproc++ | FetchContent; cross-platform subprocess без shell |
 | SQLite3 | system package (libsqlite3-dev) |
 
 ### Runtime (bundled)

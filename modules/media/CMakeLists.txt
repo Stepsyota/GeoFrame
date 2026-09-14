@@ -21,10 +21,23 @@ if(NOT TARGET Exiv2::exiv2lib)
     FetchContent_MakeAvailable(exiv2)
 endif()
 
+if(NOT TARGET reproc++)
+    set(REPROC++ ON CACHE BOOL "" FORCE)
+    set(REPROC_TEST OFF CACHE BOOL "" FORCE)
+    set(REPROC_EXAMPLES OFF CACHE BOOL "" FORCE)
+    FetchContent_Declare(
+        reproc
+        URL https://github.com/DaanDeMeyer/reproc/archive/refs/tags/v14.2.7.tar.gz
+    )
+    FetchContent_MakeAvailable(reproc)
+endif()
+
 add_library(
     geoframe_media
     STATIC
         src/metadata_extractor.cpp
+        src/preview_generator.cpp
+        src/process_runner.cpp
         src/sha256.cpp
 )
 add_library(GeoFrame::media ALIAS geoframe_media)
@@ -44,6 +57,7 @@ target_link_libraries(
         GeoFrame::storage
         OpenSSL::Crypto
         Exiv2::exiv2lib
+        reproc++
 )
 
 geoframe_set_warnings(geoframe_media)

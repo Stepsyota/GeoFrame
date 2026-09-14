@@ -6,6 +6,7 @@ add_library(
         src/hash_job_handler.cpp
         src/job_dispatcher.cpp
         src/metadata_job_handler.cpp
+        src/preview_job_handler.cpp
         src/scan_service.cpp
         src/worker_pool.cpp
 )
