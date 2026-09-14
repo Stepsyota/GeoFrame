@@ -23,6 +23,14 @@ struct GeoPoint {
     std::optional<double> altitude;
 };
 
+struct AssetMetadata {
+    std::optional<std::string> captured_at;
+    std::optional<int> width;
+    std::optional<int> height;
+    std::optional<GeoPoint> location;
+    std::optional<std::string> camera;
+};
+
 /**
  * @brief Данные нового медиафайла, найденного при сканировании библиотеки.
  */

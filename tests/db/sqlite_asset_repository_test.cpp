@@ -99,6 +99,32 @@ TEST_F(SqliteAssetRepositoryTest, UpdatesFavoriteAndStatus) {
     EXPECT_EQ(updated->status, core::AssetStatus::Trashed);
 }
 
+TEST_F(SqliteAssetRepositoryTest, UpdatesNormalizedMetadata) {
+    const auto created = repository.create(image());
+
+    repository.set_metadata(
+        created.id,
+        core::AssetMetadata{
+            .captured_at = "2026-09-15T10:00:00",
+            .width = 1920,
+            .height = 1080,
+            .location =
+                core::GeoPoint{
+                    .latitude = 50.0,
+                    .longitude = 20.0,
+                    .altitude = std::nullopt,
+                },
+            .camera = "Test camera",
+        });
+
+    const auto updated = repository.find_by_id(created.id);
+    ASSERT_TRUE(updated.has_value());
+    EXPECT_EQ(updated->captured_at, "2026-09-15T10:00:00");
+    EXPECT_EQ(updated->width, 1920);
+    EXPECT_EQ(updated->height, 1080);
+    EXPECT_EQ(updated->camera, "Test camera");
+}
+
 TEST_F(SqliteAssetRepositoryTest, RejectsRelativeSourcePath) {
     EXPECT_THROW(repository.create(image("IMG_0001.HEIC")), std::invalid_argument);
 }

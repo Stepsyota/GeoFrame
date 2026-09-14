@@ -6,11 +6,11 @@
 namespace geoframe::worker {
 
 /**
- * @brief Вычисляет SHA-256 оригинала.
+ * @brief Извлекает и сохраняет нормализованные EXIF-метаданные изображения.
  */
-class HashJobHandler : public IJobHandler {
+class MetadataJobHandler : public IJobHandler {
 public:
-    explicit HashJobHandler(core::IAssetRepository& assets);
+    explicit MetadataJobHandler(core::IAssetRepository& assets);
 
     [[nodiscard]] core::JobType job_type() const noexcept override;
     void execute(const core::Job& job) override;

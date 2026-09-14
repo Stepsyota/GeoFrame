@@ -62,7 +62,7 @@ Python-код не развиваем. Используем как reference п�
 
 - [ ] Фоновая обработка; UI доступен сразу
 - [ ] Прогресс сканирования (файлы, фото, видео, live photos, % metadata, % thumbnails)
-- [ ] Дата съёмки из EXIF; если нет — `unknown` (не fallback на filesystem)
+- [x] Дата съёмки изображения из EXIF; если нет — `unknown` (не fallback на filesystem)
 - [x] SHA-256 каждого оригинала
 - [ ] Нормализованные метаданные + raw metadata dump
 - [ ] Thumbnail (300–500 px) и Preview (1600–2500 px)
@@ -181,12 +181,13 @@ GeoFrame читает source folder. Внешние изменения файл�
 2. **CMake skeleton** — модули, GTest, partial CI ✅
 3. **SQLite** — schema, migrations, Asset repository ✅
 4. **Scanner + persistent job queue** — directory walk, restart-safe jobs ✅
-5. **Worker pool + media engine** — threads, hash, EXIF, thumbnails (ffmpeg)
-6. **HTTP API** — REST + WebSocket + TLS
-7. **React gallery** — минимальный UI
-8. **Map** — GeoJSON endpoint + MapLibre
-9. **Duplicates + series** — детекция + UI
-10. **Удалить Python-прототип**
+5. **Worker pool + SHA-256 + image EXIF** — OpenSSL, Exiv2 ✅
+6. **Preview generation** — thumbnails и previews через ffmpeg
+7. **HTTP API** — REST + WebSocket + TLS
+8. **React gallery** — минимальный UI
+9. **Map** — GeoJSON endpoint + MapLibre
+10. **Duplicates + series** — детекция + UI
+11. **Удалить Python-прототип**
 
 ## Критерий готовности MVP
 

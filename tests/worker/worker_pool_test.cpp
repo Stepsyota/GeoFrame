@@ -5,10 +5,12 @@
 #include "db/sqlite_asset_repository.hpp"
 #include "db/sqlite_job_repository.hpp"
 #include "worker/hash_job_handler.hpp"
+#include "worker/job_dispatcher.hpp"
 #include "worker/worker_pool.hpp"
 
 #include <gtest/gtest.h>
 
+#include <atomic>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
@@ -17,6 +19,19 @@
 #include <thread>
 
 namespace geoframe::worker {
+
+class CountingMetadataHandler : public IJobHandler {
+public:
+    core::JobType job_type() const noexcept override {
+        return core::JobType::Metadata;
+    }
+
+    void execute(const core::Job&) override {
+        ++executions;
+    }
+
+    std::atomic<int> executions = 0;
+};
 
 class WorkerPoolTest : public testing::Test {
 protected:
@@ -79,14 +94,21 @@ protected:
 
 TEST_F(WorkerPoolTest, CalculatesHashAndCompletesJob) {
     const auto job_id = enqueue_hash_job(true);
-    WorkerPool pool{jobs, handler, 1};
+    CountingMetadataHandler metadata_handler;
+    JobDispatcher dispatcher{assets, jobs, {&handler, &metadata_handler}};
+    WorkerPool pool{jobs, dispatcher, 1};
 
     pool.start();
     const auto job = wait_for_status(job_id, core::JobStatus::Done);
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds{2};
+    while (metadata_handler.executions == 0 && std::chrono::steady_clock::now() < deadline) {
+        std::this_thread::sleep_for(std::chrono::milliseconds{10});
+    }
     pool.stop();
 
     pool.rethrow_if_failed();
     EXPECT_EQ(job.attempts, 2);
+    EXPECT_EQ(metadata_handler.executions, 1);
     const auto asset = assets.find_by_source_path(source);
     ASSERT_TRUE(asset.has_value());
     EXPECT_EQ(asset->sha256,

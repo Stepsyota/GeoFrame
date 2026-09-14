@@ -6,11 +6,11 @@
 
 namespace geoframe::worker {
 
-WorkerPool::WorkerPool(core::IJobRepository& jobs, IJobHandler& handler,
+WorkerPool::WorkerPool(core::IJobRepository& jobs, IJobExecutor& executor,
                        const std::size_t thread_count,
                        const std::chrono::milliseconds poll_interval)
     : jobs(jobs),
-      handler(handler),
+      executor(executor),
       thread_count(thread_count),
       poll_interval(poll_interval) {
     if (thread_count == 0) {
@@ -72,7 +72,7 @@ void WorkerPool::run(const std::stop_token stop_token) {
         }
 
         try {
-            handler.execute(*job);
+            executor.execute(*job);
             jobs.mark_done(job->id);
         } catch (const std::exception& error) {
             try {

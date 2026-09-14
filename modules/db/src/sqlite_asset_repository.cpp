@@ -228,6 +228,36 @@ void SqliteAssetRepository::set_sha256(const std::int64_t id, const std::string_
     }
 }
 
+void SqliteAssetRepository::set_metadata(const std::int64_t id,
+                                         const core::AssetMetadata& metadata) {
+    auto statement = database.prepare(
+        "UPDATE assets SET captured_at = ?, width = ?, height = ?, gps_lat = ?, "
+        "gps_lon = ?, altitude = ?, camera = ? WHERE id = ? RETURNING id");
+    bind_optional(statement, 1, metadata.captured_at);
+    bind_optional(statement, 2, metadata.width);
+    bind_optional(statement, 3, metadata.height);
+
+    if (metadata.location.has_value()) {
+        statement.bind(4, metadata.location->latitude);
+        statement.bind(5, metadata.location->longitude);
+        if (metadata.location->altitude.has_value()) {
+            statement.bind(6, *metadata.location->altitude);
+        } else {
+            statement.bind_null(6);
+        }
+    } else {
+        statement.bind_null(4);
+        statement.bind_null(5);
+        statement.bind_null(6);
+    }
+
+    bind_optional(statement, 7, metadata.camera);
+    statement.bind(8, id);
+    if (!statement.step()) {
+        throw std::out_of_range("Asset not found");
+    }
+}
+
 void SqliteAssetRepository::set_favorite(const std::int64_t id, const bool favorite) {
     auto statement =
         database.prepare("UPDATE assets SET favorite = ? WHERE id = ? RETURNING id");

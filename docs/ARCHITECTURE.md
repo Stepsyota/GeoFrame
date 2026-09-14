@@ -391,7 +391,7 @@ preview_max_px = 2000
 | spdlog | FetchContent |
 | GTest | FetchContent |
 | OpenSSL | system package |
-| Exiv2 | system package |
+| Exiv2 | system package; pinned FetchContent fallback |
 | SQLite3 | system package (libsqlite3-dev) |
 
 ### Runtime (bundled)

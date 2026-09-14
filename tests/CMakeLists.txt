@@ -34,8 +34,13 @@ geoframe_set_warnings(geoframe_storage_tests)
 
 gtest_discover_tests(geoframe_storage_tests)
 
-add_executable(geoframe_media_tests media/sha256_test.cpp)
+add_executable(
+    geoframe_media_tests
+    media/metadata_extractor_test.cpp
+    media/sha256_test.cpp
+)
 target_link_libraries(geoframe_media_tests PRIVATE GeoFrame::media GTest::gtest_main)
+target_include_directories(geoframe_media_tests PRIVATE "${CMAKE_BINARY_DIR}")
 geoframe_set_warnings(geoframe_media_tests)
 
 gtest_discover_tests(geoframe_media_tests)

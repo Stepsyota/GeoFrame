@@ -8,8 +8,12 @@ namespace geoframe::worker {
 
 HashJobHandler::HashJobHandler(core::IAssetRepository& assets) : assets(assets) {}
 
+core::JobType HashJobHandler::job_type() const noexcept {
+    return core::JobType::Hash;
+}
+
 void HashJobHandler::execute(const core::Job& job) {
-    if (job.type != core::JobType::Hash) {
+    if (job.type != job_type()) {
         throw std::invalid_argument("HashJobHandler received unsupported job type");
     }
 

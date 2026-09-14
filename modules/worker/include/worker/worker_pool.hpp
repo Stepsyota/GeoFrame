@@ -19,7 +19,7 @@ namespace geoframe::worker {
  */
 class WorkerPool {
 public:
-    WorkerPool(core::IJobRepository& jobs, IJobHandler& handler, std::size_t thread_count,
+    WorkerPool(core::IJobRepository& jobs, IJobExecutor& executor, std::size_t thread_count,
                std::chrono::milliseconds poll_interval = std::chrono::milliseconds{100});
     ~WorkerPool();
 
@@ -35,7 +35,7 @@ private:
     void save_fatal_error(std::exception_ptr error);
 
     core::IJobRepository& jobs;
-    IJobHandler& handler;
+    IJobExecutor& executor;
     std::size_t thread_count;
     std::chrono::milliseconds poll_interval;
     std::vector<std::jthread> threads;
