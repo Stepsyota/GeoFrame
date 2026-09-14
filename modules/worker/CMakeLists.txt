@@ -1,4 +1,4 @@
-add_library(geoframe_worker STATIC src/worker.cpp)
+add_library(geoframe_worker STATIC src/scan_service.cpp)
 add_library(GeoFrame::worker ALIAS geoframe_worker)
 
 target_include_directories(

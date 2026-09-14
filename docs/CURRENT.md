@@ -180,8 +180,8 @@ GeoFrame читает source folder. Внешние изменения файл�
 1. **Документация** — vision, MVP, roadmap, architecture ✅
 2. **CMake skeleton** — модули, GTest, partial CI ✅
 3. **SQLite** — schema, migrations, Asset repository ✅
-4. **Scanner + job queue** — directory walk, worker thread pool
-5. **Media engine** — hash, EXIF, thumbnails (ffmpeg)
+4. **Scanner + persistent job queue** — directory walk, restart-safe jobs ✅
+5. **Worker pool + media engine** — threads, hash, EXIF, thumbnails (ffmpeg)
 6. **HTTP API** — REST + WebSocket + TLS
 7. **React gallery** — минимальный UI
 8. **Map** — GeoJSON endpoint + MapLibre

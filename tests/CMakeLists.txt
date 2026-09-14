@@ -18,8 +18,30 @@ geoframe_set_warnings(geoframe_core_tests)
 
 gtest_discover_tests(geoframe_core_tests)
 
-add_executable(geoframe_db_tests db/sqlite_asset_repository_test.cpp)
+add_executable(
+    geoframe_db_tests
+    db/sqlite_asset_repository_test.cpp
+    db/sqlite_job_repository_test.cpp
+)
 target_link_libraries(geoframe_db_tests PRIVATE GeoFrame::db GTest::gtest_main)
 geoframe_set_warnings(geoframe_db_tests)
 
 gtest_discover_tests(geoframe_db_tests)
+
+add_executable(geoframe_storage_tests storage/directory_scanner_test.cpp)
+target_link_libraries(geoframe_storage_tests PRIVATE GeoFrame::storage GTest::gtest_main)
+geoframe_set_warnings(geoframe_storage_tests)
+
+gtest_discover_tests(geoframe_storage_tests)
+
+add_executable(geoframe_worker_tests worker/scan_service_test.cpp)
+target_link_libraries(
+    geoframe_worker_tests
+    PRIVATE
+        GeoFrame::worker
+        GeoFrame::db
+        GTest::gtest_main
+)
+geoframe_set_warnings(geoframe_worker_tests)
+
+gtest_discover_tests(geoframe_worker_tests)

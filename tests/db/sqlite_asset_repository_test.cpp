@@ -44,7 +44,7 @@ protected:
 TEST_F(SqliteAssetRepositoryTest, MigrationIsIdempotent) {
     MigrationRunner{database}.migrate();
 
-    EXPECT_EQ(database.user_version(), 1);
+    EXPECT_EQ(database.user_version(), 2);
 }
 
 TEST_F(SqliteAssetRepositoryTest, CreatesAndFindsAsset) {

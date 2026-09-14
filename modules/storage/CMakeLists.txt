@@ -1,4 +1,4 @@
-add_library(geoframe_storage STATIC src/storage.cpp)
+add_library(geoframe_storage STATIC src/media_file.cpp)
 add_library(GeoFrame::storage ALIAS geoframe_storage)
 
 target_include_directories(
