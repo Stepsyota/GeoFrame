@@ -16,6 +16,7 @@ target_link_libraries(
         GeoFrame::db
         GeoFrame::worker
         GeoFrame::server
+        spdlog::spdlog
 )
 
 geoframe_set_warnings(geoframe_cli)

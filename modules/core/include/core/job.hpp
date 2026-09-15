@@ -8,9 +8,10 @@ namespace geoframe::core {
 
 enum class JobType {
     Hash,
-    Metadata,
-    Thumbnail,
-    Preview,
+    Metadata,         ///< EXIF extraction for images (Exiv2)
+    VideoMetadata,    ///< metadata extraction for videos (ffprobe)
+    Thumbnail,        ///< thumbnail generation (images: ffmpeg scale; videos: poster frame)
+    Preview,          ///< larger preview, images only
     Phash,
     SeriesDetect,
 };

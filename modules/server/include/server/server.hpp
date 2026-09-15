@@ -1,7 +1,5 @@
 #pragma once
 
-namespace geoframe::server {
+// Entry point header — see http_server.hpp for the main server class,
+// router.hpp for request routing, and tls.hpp for certificate generation.
 
-void initialize();
-
-}  // namespace geoframe::server

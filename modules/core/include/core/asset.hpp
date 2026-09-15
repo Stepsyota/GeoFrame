@@ -31,6 +31,14 @@ struct AssetMetadata {
     std::optional<std::string> camera;
 };
 
+struct VideoMetadata {
+    std::optional<double> duration_seconds;
+    std::optional<int> width;
+    std::optional<int> height;
+    std::optional<std::string> captured_at;
+    std::optional<std::string> codec;
+};
+
 /**
  * @brief Данные нового медиафайла, найденного при сканировании библиотеки.
  */
@@ -56,6 +64,9 @@ struct Asset : NewAsset {
     bool favorite = false;
     std::optional<std::filesystem::path> thumbnail_path;
     std::optional<std::filesystem::path> preview_path;
+    // video-specific (null for images)
+    std::optional<double> duration_seconds;
+    std::optional<std::string> video_codec;
 };
 
 }  // namespace geoframe::core

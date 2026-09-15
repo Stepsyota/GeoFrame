@@ -44,7 +44,7 @@ protected:
 TEST_F(SqliteAssetRepositoryTest, MigrationIsIdempotent) {
     MigrationRunner{database}.migrate();
 
-    EXPECT_EQ(database.user_version(), 4);
+    EXPECT_EQ(database.user_version(), 6);
 }
 
 TEST_F(SqliteAssetRepositoryTest, CreatesAndFindsAsset) {
@@ -154,6 +154,40 @@ TEST_F(SqliteAssetRepositoryTest, AllowsDuplicateHash) {
     auto duplicate = image("/library/IMG_0002.HEIC");
 
     EXPECT_NO_THROW(repository.create(duplicate));
+}
+
+TEST_F(SqliteAssetRepositoryTest, CountsActiveAndTrashedAssets) {
+    const auto a1 = repository.create(image("/library/IMG_0001.HEIC"));
+    repository.create(image("/library/IMG_0002.HEIC"));
+    repository.set_status(a1.id, core::AssetStatus::Trashed);
+
+    EXPECT_EQ(repository.count(core::AssetStatus::Active), 1);
+    EXPECT_EQ(repository.count(core::AssetStatus::Trashed), 1);
+}
+
+TEST_F(SqliteAssetRepositoryTest, SetsVideoMetadata) {
+    auto video = image("/library/VID_0001.MOV");
+    video.media_type = core::MediaType::Video;
+    video.sha256 = std::nullopt;
+    video.captured_at = std::nullopt;
+    const auto created = repository.create(video);
+
+    repository.set_video_metadata(
+        created.id,
+        core::VideoMetadata{
+            .duration_seconds = 12.5,
+            .width = 1920,
+            .height = 1080,
+            .captured_at = "2026-09-15T10:00:00",
+            .codec = "h264",
+        });
+
+    const auto updated = repository.find_by_id(created.id);
+    ASSERT_TRUE(updated.has_value());
+    ASSERT_TRUE(updated->duration_seconds.has_value());
+    EXPECT_DOUBLE_EQ(*updated->duration_seconds, 12.5);
+    EXPECT_EQ(updated->video_codec, "h264");
+    EXPECT_EQ(updated->captured_at, "2026-09-15T10:00:00");
 }
 
 }  // namespace geoframe::db

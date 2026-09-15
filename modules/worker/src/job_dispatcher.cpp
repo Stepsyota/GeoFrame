@@ -36,22 +36,39 @@ IJobHandler* JobDispatcher::find_handler(const core::JobType type) const {
 
 void JobDispatcher::enqueue_next(const core::Job& completed_job) {
     std::optional<core::JobType> next_type;
-    if (completed_job.type == core::JobType::Metadata) {
-        next_type = core::JobType::Thumbnail;
-    } else if (completed_job.type == core::JobType::Thumbnail) {
-        next_type = core::JobType::Preview;
-    } else if (completed_job.type != core::JobType::Hash) {
-        return;
-    }
 
-    if (completed_job.type == core::JobType::Hash) {
+    switch (completed_job.type) {
+    case core::JobType::Hash: {
         const auto asset = assets.find_by_id(completed_job.asset_id);
         if (!asset.has_value()) {
             throw std::out_of_range("Asset disappeared after job processing");
         }
         if (asset->media_type == core::MediaType::Image) {
             next_type = core::JobType::Metadata;
+        } else if (asset->media_type == core::MediaType::Video) {
+            next_type = core::JobType::VideoMetadata;
         }
+        break;
+    }
+    case core::JobType::Metadata:
+        // Image: Metadata → Thumbnail
+        next_type = core::JobType::Thumbnail;
+        break;
+    case core::JobType::VideoMetadata:
+        // Video: VideoMetadata → Thumbnail (poster frame)
+        next_type = core::JobType::Thumbnail;
+        break;
+    case core::JobType::Thumbnail:
+        // Images only: Thumbnail → Preview; videos skip Preview
+        {
+            const auto asset = assets.find_by_id(completed_job.asset_id);
+            if (asset.has_value() && asset->media_type == core::MediaType::Image) {
+                next_type = core::JobType::Preview;
+            }
+        }
+        break;
+    default:
+        return;
     }
 
     if (next_type.has_value() && find_handler(*next_type) != nullptr) {

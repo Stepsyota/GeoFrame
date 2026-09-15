@@ -8,6 +8,7 @@ add_library(
         src/metadata_job_handler.cpp
         src/preview_job_handler.cpp
         src/scan_service.cpp
+        src/video_job_handler.cpp
         src/worker_pool.cpp
 )
 add_library(GeoFrame::worker ALIAS geoframe_worker)

@@ -39,6 +39,7 @@ add_library(
         src/preview_generator.cpp
         src/process_runner.cpp
         src/sha256.cpp
+        src/video_extractor.cpp
 )
 add_library(GeoFrame::media ALIAS geoframe_media)
 

@@ -35,6 +35,18 @@ inline constexpr std::array migrations{
 @GEOFRAME_MIGRATION_004@
 )GEFRAME_SQL",
     },
+    Migration{
+        5,
+        R"GEFRAME_SQL(
+@GEOFRAME_MIGRATION_005@
+)GEFRAME_SQL",
+    },
+    Migration{
+        6,
+        R"GEFRAME_SQL(
+@GEOFRAME_MIGRATION_006@
+)GEFRAME_SQL",
+    },
 };
 
 }  // namespace geoframe::db

@@ -60,18 +60,18 @@ Python-код не развиваем. Используем как reference п�
 
 #### Индексация
 
-- [ ] Фоновая обработка; UI доступен сразу
+- [x] Фоновая обработка; UI доступен сразу (WorkerPool запускается до HTTP server)
 - [ ] Прогресс сканирования (файлы, фото, видео, live photos, % metadata, % thumbnails)
 - [x] Дата съёмки изображения из EXIF; если нет — `unknown` (не fallback на filesystem)
 - [x] SHA-256 каждого оригинала
-- [ ] Нормализованные метаданные + raw metadata dump
-- [x] Thumbnail и Preview изображений с настраиваемым max size
+- [x] Нормализованные метаданные изображений и видео (Exiv2 / ffprobe)
+- [x] Thumbnail и Preview изображений с настраиваемым max size; видео: poster frame
 
 #### Медиа
 
-- [ ] JPEG, HEIC, PNG, MOV (расширить позже)
-- [ ] Видео: poster frame, длительность, базовые метаданные
-- [ ] Live Photo как один объект (HEIC + MOV)
+- [x] JPEG, HEIC, PNG, MOV (расширить позже)
+- [x] Видео: poster frame, длительность, базовые метаданные (ffprobe + ffmpeg)
+- [ ] Live Photo как один объект (HEIC + MOV) — таблица live_photos есть, pairing-логика позже
 - [x] Неизвестные файлы: учитывать в scan report, не удалять
 
 #### Web UI
@@ -93,10 +93,10 @@ Python-код не развиваем. Используем как reference п�
 
 - [x] Один бинарник `geoframe` (modular monolith)
 - [x] SQLite для метаданных (встроенная, self-bootstrap)
-- [ ] HTTPS (self-signed cert при первом запуске)
-- [ ] Локальная сеть (LAN)
-- [ ] CLI (`geoframe serve`, `geoframe scan`, ...)
-- [ ] Предупреждение при заполнении диска
+- [x] HTTPS (self-signed cert при первом запуске, OpenSSL)
+- [x] Локальная сеть (LAN) — сервер на 0.0.0.0:8443
+- [x] CLI (`geoframe serve`, `geoframe scan`, `geoframe status`)
+- [x] Предупреждение при заполнении диска (< 1 GiB)
 
 ### Не входит в MVP
 
@@ -184,11 +184,13 @@ GeoFrame читает source folder. Внешние изменения файл�
 4. **Scanner + persistent job queue** — directory walk, restart-safe jobs ✅
 5. **Worker pool + SHA-256 + image EXIF** — OpenSSL, Exiv2 ✅
 6. **Preview generation** — thumbnails и previews через ffmpeg ✅
-7. **HTTP API** — REST + WebSocket + TLS
-8. **React gallery** — каркас и demo mode ✅; подключение после HTTP API
-9. **Map** — GeoJSON endpoint + MapLibre
-10. **Duplicates + series** — детекция + UI
-11. **Удалить Python-прототип**
+7. **Video pipeline** — ffprobe metadata, ffmpeg poster frame, video DB fields ✅
+8. **HTTP API + CLI + TLS** — REST + Boost.Beast + self-signed cert + CLI subcommands ✅
+9. **React gallery** — каркас и demo mode ✅; подключение к реальному API — следующий шаг
+10. **WebSocket progress** — live прогресс индексации (`/ws/events`)
+11. **Map** — GeoJSON endpoint + MapLibre
+12. **Duplicates + series** — детекция + UI
+13. **Удалить Python-прототип**
 
 ## Критерий готовности MVP
 

@@ -13,7 +13,7 @@ namespace {
 constexpr std::string_view kAssetColumns =
     "id, source_path, original_filename, media_type, status, size_bytes, sha256, "
     "captured_at, width, height, gps_lat, gps_lon, altitude, camera, favorite, "
-    "thumbnail_path, preview_path";
+    "thumbnail_path, preview_path, duration_seconds, video_codec";
 
 std::string_view to_string(const core::MediaType type) {
     switch (type) {
@@ -119,6 +119,10 @@ core::Asset read_asset(const Statement& statement) {
     if (!statement.column_is_null(16)) {
         asset.preview_path = statement.column_text(16);
     }
+    if (!statement.column_is_null(17)) {
+        asset.duration_seconds = statement.column_double(17);
+    }
+    asset.video_codec = optional_text(statement, 18);
     return asset;
 }
 
@@ -307,6 +311,38 @@ void SqliteAssetRepository::set_status(const std::int64_t id, const core::AssetS
     auto statement = database.prepare("UPDATE assets SET status = ? WHERE id = ? RETURNING id");
     statement.bind(1, to_string(status));
     statement.bind(2, id);
+    if (!statement.step()) {
+        throw std::out_of_range("Asset not found");
+    }
+}
+
+std::int64_t SqliteAssetRepository::count(const core::AssetStatus status) {
+    auto statement =
+        database.prepare("SELECT COUNT(*) FROM assets WHERE status = ?");
+    statement.bind(1, to_string(status));
+    if (!statement.step()) {
+        throw std::runtime_error("COUNT query returned no rows");
+    }
+    return statement.column_int64(0);
+}
+
+void SqliteAssetRepository::set_video_metadata(const std::int64_t id,
+                                               const core::VideoMetadata& metadata) {
+    auto statement = database.prepare(
+        "UPDATE assets SET duration_seconds = ?, video_codec = ?, width = ?, height = ?, "
+        "captured_at = ? WHERE id = ? RETURNING id");
+
+    if (metadata.duration_seconds.has_value()) {
+        statement.bind(1, *metadata.duration_seconds);
+    } else {
+        statement.bind_null(1);
+    }
+    bind_optional(statement, 2, metadata.codec);
+    bind_optional(statement, 3, metadata.width);
+    bind_optional(statement, 4, metadata.height);
+    bind_optional(statement, 5, metadata.captured_at);
+    statement.bind(6, id);
+
     if (!statement.step()) {
         throw std::out_of_range("Asset not found");
     }
