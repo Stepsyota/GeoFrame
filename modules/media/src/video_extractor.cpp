@@ -129,18 +129,19 @@ void generate_video_poster(const std::filesystem::path& source,
 
     const auto tmp = dest.parent_path() / (dest.filename().string() + ".tmp.jpg");
 
-    const std::string scale_filter =
-        "scale='if(gt(iw,ih)," + std::to_string(max_px) + ",-2)':"
-        "'if(gt(iw,ih),-2," + std::to_string(max_px) + ")'";
+    const std::string s = std::to_string(max_px);
+    const std::string filter_complex =
+        "[0:v]scale='if(gt(iw,ih)," + s + ",-2)':'if(gt(iw,ih),-2," + s + ")'[out]";
 
     const std::vector<std::string> args = {
         "ffmpeg",
-        "-y",                          // overwrite
-        "-ss", "0",                    // seek to start
+        "-y",                           // overwrite
+        "-ss", "0",                     // seek to start
         "-i", source.string(),
-        "-vframes", "1",               // single frame
-        "-vf", scale_filter,
-        "-q:v", "3",                   // JPEG quality
+        "-filter_complex", filter_complex,  // works with complex-decoder formats (HEIC, HEVC)
+        "-map", "[out]",
+        "-frames:v", "1",               // single frame
+        "-q:v", "3",                    // JPEG quality
         tmp.string(),
     };
 

@@ -117,8 +117,17 @@ Args parse_args(const int argc, char* argv[]) {
 
 core::Config build_config(const Args& args) {
     core::Config cfg;
-    cfg.source         = args.source.empty() ? std::filesystem::path{} : std::filesystem::path{args.source};
-    cfg.data_dir       = args.data_dir.empty() ? default_data_dir() : std::filesystem::path{args.data_dir};
+
+    // Always resolve to absolute paths — relative paths break child components
+    // that validate is_absolute() (VideoJobHandler, PreviewJobHandler, etc.)
+    const auto raw_data_dir =
+        args.data_dir.empty() ? default_data_dir() : std::filesystem::path{args.data_dir};
+    cfg.data_dir = std::filesystem::absolute(raw_data_dir).lexically_normal();
+
+    if (!args.source.empty()) {
+        cfg.source = std::filesystem::absolute(std::filesystem::path{args.source}).lexically_normal();
+    }
+
     cfg.host           = args.host.empty() ? "0.0.0.0" : args.host;
     cfg.port           = args.port != 0 ? args.port : 8443;
     cfg.worker_threads = args.threads;

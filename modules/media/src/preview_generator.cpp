@@ -27,14 +27,26 @@ void generate_image_preview(const std::filesystem::path& source,
     auto temporary = destination;
     temporary.replace_filename(destination.stem().string() + ".tmp.jpg");
 
-    const std::string size = std::to_string(max_size);
-    const std::string filter =
-        "scale=w='min(" + size + ",iw)':h='min(" + size +
-        ",ih)':force_original_aspect_ratio=decrease";
+    // Use -filter_complex instead of -vf so the filter is compatible with
+    // HEIC/HEIF inputs: modern ffmpeg (≥5.x) creates an internal complex
+    // filtergraph for HEIC decoding, which conflicts with -vf (simple filter).
+    //
+    // Scale: if landscape → width=max_size, height proportional (-2);
+    //        if portrait  → height=max_size, width proportional (-2).
+    // -2 means "make divisible by 2 and proportional" (required by some codecs).
+    const std::string s = std::to_string(max_size);
+    const std::string filter_complex =
+        "[0:v]scale='if(gt(iw,ih)," + s + ",-2)':'if(gt(iw,ih),-2," + s + ")'[out]";
+
     const std::vector<std::string> arguments{
-        ffmpeg_binary, "-hide_banner", "-loglevel", "error", "-nostdin", "-y",
-        "-i",          source.string(),  "-vf",       filter,  "-frames:v", "1",
-        "-q:v",        "3",              temporary.string(),
+        ffmpeg_binary,
+        "-hide_banner", "-loglevel", "error", "-nostdin", "-y",
+        "-i", source.string(),
+        "-filter_complex", filter_complex,
+        "-map", "[out]",
+        "-frames:v", "1",
+        "-q:v", "3",
+        temporary.string(),
     };
 
     const auto result = run_process(arguments, std::chrono::minutes{5});
