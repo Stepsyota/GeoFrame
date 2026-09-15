@@ -1,6 +1,8 @@
 import { AlertCircle, ImageOff } from 'lucide-react'
+import { useMemo, useState } from 'react'
 
 import { AppShell } from '../components/AppShell'
+import { Lightbox } from '../components/Lightbox'
 import { MediaCard } from '../components/MediaCard'
 import { useAssets } from '../hooks/useAssets'
 import type { AssetSummary } from '../types/asset'
@@ -50,6 +52,22 @@ const GallerySkeleton = () => (
 
 export const GalleryPage = () => {
   const { data, loading, error } = useAssets()
+  const [selectedId, setSelectedId] = useState<number | null>(null)
+
+  const assets = useMemo(() => data?.items ?? [], [data])
+  const selectedIndex = selectedId === null ? -1 : assets.findIndex((a) => a.id === selectedId)
+  const selectedAsset = selectedIndex >= 0 ? assets[selectedIndex] : null
+
+  const openAsset = (asset: AssetSummary) => setSelectedId(asset.id)
+  const closeLightbox = () => setSelectedId(null)
+  const goPrev = () => {
+    if (selectedIndex > 0) setSelectedId(assets[selectedIndex - 1].id)
+  }
+  const goNext = () => {
+    if (selectedIndex >= 0 && selectedIndex < assets.length - 1) {
+      setSelectedId(assets[selectedIndex + 1].id)
+    }
+  }
 
   return (
     <AppShell total={data?.total}>
@@ -88,11 +106,22 @@ export const GalleryPage = () => {
             </div>
             <div className="media-grid">
               {assets.map((asset) => (
-                <MediaCard asset={asset} key={asset.id} />
+                <MediaCard asset={asset} key={asset.id} onOpen={openAsset} />
               ))}
             </div>
           </section>
         ))}
+
+      {selectedAsset && (
+        <Lightbox
+          asset={selectedAsset}
+          hasPrev={selectedIndex > 0}
+          hasNext={selectedIndex >= 0 && selectedIndex < assets.length - 1}
+          onClose={closeLightbox}
+          onPrev={goPrev}
+          onNext={goNext}
+        />
+      )}
     </AppShell>
   )
 }

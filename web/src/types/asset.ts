@@ -11,6 +11,7 @@ export interface AssetSummary {
   height: number | null
   favorite: boolean
   thumbnailUrl: string | null
+  previewUrl: string | null
 }
 
 export interface AssetPage {

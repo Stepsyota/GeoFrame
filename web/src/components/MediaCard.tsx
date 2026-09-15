@@ -4,10 +4,16 @@ import type { AssetSummary } from '../types/asset'
 
 interface MediaCardProps {
   asset: AssetSummary
+  onOpen?: (asset: AssetSummary) => void
 }
 
-export const MediaCard = ({ asset }: MediaCardProps) => (
-  <button className="media-card" type="button" aria-label={`Open ${asset.originalFilename}`}>
+export const MediaCard = ({ asset, onOpen }: MediaCardProps) => (
+  <button
+    className="media-card"
+    type="button"
+    aria-label={`Open ${asset.originalFilename}`}
+    onClick={() => onOpen?.(asset)}
+  >
     {asset.thumbnailUrl ? (
       <img src={asset.thumbnailUrl} alt="" loading="lazy" />
     ) : (

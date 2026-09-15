@@ -33,6 +33,7 @@ const item = (
   height: 3024,
   favorite,
   thumbnailUrl: thumbnail(name.replace(/\..+$/, ''), ...colors),
+  previewUrl: thumbnail(name.replace(/\..+$/, ''), ...colors),
 })
 
 const items = [
