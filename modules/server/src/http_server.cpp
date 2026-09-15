@@ -55,41 +55,27 @@ std::string mime_type(const std::filesystem::path& path) {
     return "application/octet-stream";
 }
 
-// ── WebSocket session ──────────────────────────────────────────────────────
+HttpRequest to_http_request(const http::request<http::string_body>& req) {
+    const auto target = req.target();
+    const std::string target_str{target};
+    const auto qpos = target_str.find('?');
+    const auto path = (qpos == std::string::npos) ? target_str : target_str.substr(0, qpos);
+    const auto query = (qpos == std::string::npos) ? std::string{} : target_str.substr(qpos + 1);
 
-class WsSession {
-public:
-    explicit WsSession(ssl::stream<tcp::socket> stream)
-        : ws_(std::move(stream)) {}
+    return HttpRequest{
+        .method = std::string{req.method_string()},
+        .target = target_str,
+        .path = path,
+        .query = query,
+        .body = req.body(),
+        .keep_alive = req.keep_alive(),
+    };
+}
 
-    void run(http::request<http::string_body> upgrade_req) {
-        ws_.set_option(ws::stream_base::timeout::suggested(beast::role_type::server));
-        ws_.accept(upgrade_req);
+// ── Shared HTTP session logic (plain TCP or TLS) ────────────────────────────
 
-        beast::flat_buffer buffer;
-        // Push a simple heartbeat every 5 s; read client messages (ignore them for MVP)
-        ws_.async_accept(upgrade_req, [](beast::error_code){});
-
-        // Blocking loop: send progress ping every 5 s
-        while (ws_.is_open()) {
-            try {
-                std::this_thread::sleep_for(std::chrono::seconds{5});
-                if (!ws_.is_open()) break;
-                ws_.text(true);
-                ws_.write(net::buffer(R"({"type":"ping"})"));
-            } catch (const std::exception&) {
-                break;
-            }
-        }
-    }
-
-private:
-    ws::stream<ssl::stream<tcp::socket>> ws_;
-};
-
-// ── HTTP session ───────────────────────────────────────────────────────────
-
-void send_file(ssl::stream<tcp::socket>& stream,
+template<typename Stream>
+void send_file(Stream& stream,
                const http::request<http::string_body>& req,
                const HttpResponse& response) {
     const auto& fp = response.file_path;
@@ -117,18 +103,28 @@ void send_file(ssl::stream<tcp::socket>& stream,
     http::write(stream, res);
 }
 
-void handle_session(ssl::stream<tcp::socket> stream, const Router& router) {
-    beast::error_code ec;
-    stream.handshake(ssl::stream_base::server, ec);
-    if (ec) {
-        spdlog::debug("TLS handshake error: {}", ec.message());
-        return;
-    }
+template<typename Stream>
+void write_json_response(Stream& stream,
+                         const http::request<http::string_body>& req,
+                         const HttpResponse& response,
+                         beast::error_code& ec) {
+    http::response<http::string_body> res{
+        static_cast<http::status>(response.status), req.version()};
+    res.set(http::field::content_type, response.content_type);
+    res.set(http::field::access_control_allow_origin, "*");
+    res.body() = response.body;
+    res.keep_alive(req.keep_alive());
+    res.prepare_payload();
+    http::write(stream, res, ec);
+}
 
+template<typename Stream>
+void handle_http_session(Stream stream, const Router& router) {
     beast::flat_buffer buffer;
 
     while (true) {
         http::request<http::string_body> req;
+        beast::error_code ec;
         http::read(stream, buffer, req, ec);
         if (ec == http::error::end_of_stream || ec == beast::error::timeout) {
             break;
@@ -138,52 +134,51 @@ void handle_session(ssl::stream<tcp::socket> stream, const Router& router) {
             break;
         }
 
-        // WebSocket upgrade
         if (ws::is_upgrade(req)) {
-            WsSession wss{std::move(stream)};
-            wss.run(std::move(req));
-            return;
+            http::response<http::string_body> res{http::status::not_implemented, req.version()};
+            res.set(http::field::content_type, "application/json");
+            res.body() = R"({"error":"WebSocket requires HTTPS"})";
+            res.keep_alive(false);
+            res.prepare_payload();
+            http::write(stream, res);
+            break;
         }
 
-        // Convert to our request type
-        const auto target = req.target();
-        const std::string target_str{target};
-        const auto qpos = target_str.find('?');
-        const auto path = (qpos == std::string::npos) ? target_str : target_str.substr(0, qpos);
-        const auto query = (qpos == std::string::npos) ? std::string{} : target_str.substr(qpos + 1);
+        const auto response = router.dispatch(to_http_request(req));
 
-        HttpRequest hr{
-            .method = std::string{req.method_string()},
-            .target = target_str,
-            .path = path,
-            .query = query,
-            .body = req.body(),
-            .keep_alive = req.keep_alive(),
-        };
-
-        const auto response = router.dispatch(hr);
-
-        // File response
         if (!response.file_path.empty()) {
             send_file(stream, req, response);
-            if (!response.keep_alive) break;
+            if (!response.keep_alive) {
+                break;
+            }
             continue;
         }
 
-        // String response
-        http::response<http::string_body> res{
-            static_cast<http::status>(response.status), req.version()};
-        res.set(http::field::content_type, response.content_type);
-        res.set(http::field::access_control_allow_origin, "*");
-        res.body() = response.body;
-        res.keep_alive(req.keep_alive());
-        res.prepare_payload();
-        http::write(stream, res, ec);
+        write_json_response(stream, req, response, ec);
         if (ec || !req.keep_alive()) {
             break;
         }
     }
+}
 
+void handle_plain_session(tcp::socket socket, const Router& router) {
+    beast::tcp_stream stream{std::move(socket)};
+    stream.expires_after(std::chrono::seconds{30});
+    handle_http_session(std::move(stream), router);
+
+    beast::error_code ec;
+    stream.socket().shutdown(tcp::socket::shutdown_send, ec);
+}
+
+void handle_tls_session(ssl::stream<tcp::socket> stream, const Router& router) {
+    beast::error_code ec;
+    stream.handshake(ssl::stream_base::server, ec);
+    if (ec) {
+        spdlog::debug("TLS handshake error: {}", ec.message());
+        return;
+    }
+
+    handle_http_session(std::move(stream), router);
     stream.shutdown(ec);
 }
 
@@ -217,7 +212,6 @@ HttpServer::~HttpServer() = default;
 void HttpServer::run() {
     auto& impl = *impl_;
 
-    // TLS setup
     if (!impl.config.skip_tls) {
         const auto certs_dir = impl.config.data_dir / "certs";
         const auto cert_path = certs_dir / "server.crt";
@@ -252,16 +246,21 @@ void HttpServer::run() {
             continue;
         }
 
-        std::thread([sock = std::move(socket), &impl]() mutable {
-            ssl::stream<tcp::socket> stream{std::move(sock), impl.ssl_ctx};
-            handle_session(std::move(stream), impl.router);
-        }).detach();
+        if (impl.config.skip_tls) {
+            std::thread([sock = std::move(socket), &impl]() mutable {
+                handle_plain_session(std::move(sock), impl.router);
+            }).detach();
+        } else {
+            std::thread([sock = std::move(socket), &impl]() mutable {
+                ssl::stream<tcp::socket> stream{std::move(sock), impl.ssl_ctx};
+                handle_tls_session(std::move(stream), impl.router);
+            }).detach();
+        }
     }
 }
 
 void HttpServer::stop() {
     impl_->running = false;
-    // Wake the acceptor by connecting to itself
     try {
         net::io_context tmp;
         tcp::socket s{tmp};

@@ -69,6 +69,25 @@ HttpResponse not_found(const std::string& what = "Not found") {
 
 // ── Asset serialisation ────────────────────────────────────────────────────
 
+/**
+ * @brief Normalises an EXIF date string to ISO 8601 for JSON consumption.
+ *
+ * Exiv2 stores dates as "YYYY:MM:DD HH:MM:SS".  JavaScript's Date() and
+ * Intl.DateTimeFormat require "YYYY-MM-DDTHH:MM:SS".  Returns empty string
+ * on unrecognised input so the caller can emit null.
+ */
+std::string exif_to_iso(const std::string& exif) {
+    // Expected length: "YYYY:MM:DD HH:MM:SS" = 19 chars
+    if (exif.size() < 19) {
+        return {};
+    }
+    std::string iso = exif;
+    iso[4]  = '-';
+    iso[7]  = '-';
+    iso[10] = 'T';
+    return iso;
+}
+
 json asset_to_json(const core::Asset& a) {
     json obj;
     obj["id"] = a.id;
@@ -76,32 +95,52 @@ json asset_to_json(const core::Asset& a) {
     obj["mediaType"] = (a.media_type == core::MediaType::Image) ? "image" : "video";
     obj["status"] = (a.status == core::AssetStatus::Active) ? "active" : "trashed";
     obj["sizeBytes"] = a.size_bytes;
-    obj["capturedAt"] = a.captured_at.has_value() ? json{*a.captured_at} : json{nullptr};
-    obj["width"] = a.width.has_value() ? json{*a.width} : json{nullptr};
-    obj["height"] = a.height.has_value() ? json{*a.height} : json{nullptr};
-    obj["camera"] = a.camera.has_value() ? json{*a.camera} : json{nullptr};
+
+    // json{scalar} with braces creates a JSON array — assign scalars directly.
+    // Never use (condition ? string : nullptr): common type becomes std::string
+    // and nullptr branch throws "construction from null is not valid".
+    if (a.captured_at.has_value()) {
+        const auto iso = exif_to_iso(*a.captured_at);
+        if (iso.empty()) {
+            obj["capturedAt"] = nullptr;
+        } else {
+            obj["capturedAt"] = iso;
+        }
+    } else {
+        obj["capturedAt"] = nullptr;
+    }
+
+    if (a.width.has_value())  obj["width"]  = *a.width;  else obj["width"]  = nullptr;
+    if (a.height.has_value()) obj["height"] = *a.height; else obj["height"] = nullptr;
+    if (a.camera.has_value()) obj["camera"] = *a.camera; else obj["camera"] = nullptr;
     obj["favorite"] = a.favorite;
-    obj["sha256"] = a.sha256.has_value() ? json{*a.sha256} : json{nullptr};
-    obj["durationSeconds"] =
-        a.duration_seconds.has_value() ? json{*a.duration_seconds} : json{nullptr};
-    obj["videoCodec"] = a.video_codec.has_value() ? json{*a.video_codec} : json{nullptr};
+    if (a.sha256.has_value()) obj["sha256"] = *a.sha256; else obj["sha256"] = nullptr;
+    if (a.duration_seconds.has_value()) obj["durationSeconds"] = *a.duration_seconds;
+    else obj["durationSeconds"] = nullptr;
+    if (a.video_codec.has_value()) obj["videoCodec"] = *a.video_codec;
+    else obj["videoCodec"] = nullptr;
 
     if (a.location.has_value()) {
-        obj["gps"] = {{"lat", a.location->latitude},
-                      {"lon", a.location->longitude},
-                      {"alt", a.location->altitude.has_value()
-                                  ? json{*a.location->altitude}
-                                  : json{nullptr}}};
+        json gps;
+        gps["lat"] = a.location->latitude;
+        gps["lon"] = a.location->longitude;
+        if (a.location->altitude.has_value()) gps["alt"] = *a.location->altitude;
+        else gps["alt"] = nullptr;
+        obj["gps"] = gps;
     } else {
         obj["gps"] = nullptr;
     }
 
-    obj["thumbnailUrl"] = a.thumbnail_path.has_value()
-                              ? json{"/api/assets/" + std::to_string(a.id) + "/thumbnail"}
-                              : json{nullptr};
-    obj["previewUrl"] = a.preview_path.has_value()
-                            ? json{"/api/assets/" + std::to_string(a.id) + "/preview"}
-                            : json{nullptr};
+    if (a.thumbnail_path.has_value()) {
+        obj["thumbnailUrl"] = "/api/assets/" + std::to_string(a.id) + "/thumbnail";
+    } else {
+        obj["thumbnailUrl"] = nullptr;
+    }
+    if (a.preview_path.has_value()) {
+        obj["previewUrl"] = "/api/assets/" + std::to_string(a.id) + "/preview";
+    } else {
+        obj["previewUrl"] = nullptr;
+    }
     return obj;
 }
 
@@ -199,7 +238,7 @@ void Router::register_routes() {
             std::from_chars(offset_str.data(), offset_str.data() + offset_str.size(), offset);
             limit = std::min(limit, std::size_t{200});
 
-            const auto items = assets_.list(limit, offset);
+            const auto items = assets_.list(limit, offset, status);
             const auto total = assets_.count(status);
 
             json body;

@@ -6,14 +6,20 @@ export default defineConfig({
   server: {
     host: true,
     proxy: {
+      // Backend port is read from VITE_BACKEND_PORT env var (default 8080).
+      // Use --skip-tls for dev so Vite can proxy plain HTTP without
+      // fighting Node.js's strict self-signed-cert validation.
+      //
+      //   geoframe serve --skip-tls --port 8080 --source ./Photos --data-dir ./local
+      //   npm run dev          ← proxies to http://localhost:8080
       '/api': {
-        target: 'https://localhost:8443',
-        secure: false,
+        target: `http://localhost:${process.env.VITE_BACKEND_PORT ?? 8080}`,
+        changeOrigin: true,
       },
       '/ws': {
-        target: 'wss://localhost:8443',
+        target: `ws://localhost:${process.env.VITE_BACKEND_PORT ?? 8080}`,
         ws: true,
-        secure: false,
+        changeOrigin: true,
       },
     },
   },

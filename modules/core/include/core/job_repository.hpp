@@ -21,6 +21,8 @@ public:
     virtual void mark_done(std::int64_t id) = 0;
     virtual void mark_failed(std::int64_t id, std::string_view error) = 0;
     virtual int recover_interrupted() = 0;
+    /** Reset all Failed jobs back to Pending so they are retried. */
+    virtual int retry_failed() = 0;
 };
 
 }  // namespace geoframe::core

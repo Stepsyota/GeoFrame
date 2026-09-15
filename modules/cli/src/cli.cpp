@@ -242,6 +242,12 @@ int cmd_serve(const Args& args) {
 
     spdlog::info("Worker pool started with {} threads", thread_count);
 
+    // Retry jobs that failed in a previous run (e.g. due to missing codecs or path bugs).
+    const int retried = job_repo.retry_failed();
+    if (retried > 0) {
+        spdlog::info("Reset {} previously failed jobs for retry", retried);
+    }
+
     // If source is configured, trigger an immediate scan
     if (!config.source.empty() && std::filesystem::is_directory(config.source)) {
         spdlog::info("Auto-scanning source: {}", config.source.string());
@@ -279,6 +285,12 @@ int cmd_scan(const Args& args) {
     storage::DirectoryScanner scanner;
     worker::ScanService scan_svc{scanner, asset_repo, job_repo};
 
+    // Reset previously failed jobs so they are retried with the current binary.
+    const int retried = job_repo.retry_failed();
+    if (retried > 0) {
+        spdlog::info("Reset {} previously failed jobs for retry", retried);
+    }
+
     spdlog::info("Scanning: {}", source.string());
     const auto report = scan_svc.scan(source);
 
@@ -287,6 +299,10 @@ int cmd_scan(const Args& args) {
               << "Already known: " << report.already_indexed << '\n'
               << "Unsupported:   " << report.unsupported    << '\n'
               << "Errors:        " << report.filesystem_errors << '\n';
+    if (retried > 0) {
+        std::cout << "Failed jobs queued for retry: " << retried << '\n'
+                  << "Start 'geoframe serve' to process them.\n";
+    }
     return 0;
 }
 

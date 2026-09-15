@@ -76,15 +76,19 @@ TEST_F(SqliteAssetRepositoryTest, FindsAssetBySourcePath) {
 }
 
 TEST_F(SqliteAssetRepositoryTest, ListsAssetsWithPagination) {
+    // Assets without captured_at sort by id DESC (newest first within nulls group)
     repository.create(image("/library/IMG_0001.HEIC"));
     auto second = image("/library/IMG_0002.HEIC");
     second.sha256 = std::string(64, 'b');
     repository.create(second);
 
+    // list() sorts by (captured_at DESC NULLS LAST, id DESC)
+    // both have no captured_at → order is id DESC: [2, 1]
+    // offset=1 skips first → returns IMG_0001
     const auto assets = repository.list(1, 1);
 
     ASSERT_EQ(assets.size(), 1);
-    EXPECT_EQ(assets.front().source_path, "/library/IMG_0002.HEIC");
+    EXPECT_EQ(assets.front().source_path, "/library/IMG_0001.HEIC");
 }
 
 TEST_F(SqliteAssetRepositoryTest, UpdatesFavoriteAndStatus) {

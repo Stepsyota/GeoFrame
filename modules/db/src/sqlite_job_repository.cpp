@@ -142,4 +142,11 @@ int SqliteJobRepository::recover_interrupted() {
     return database.changes();
 }
 
+int SqliteJobRepository::retry_failed() {
+    database.execute(
+        "UPDATE jobs SET status = 'pending', started_at = NULL, error = NULL "
+        "WHERE status = 'failed'");
+    return database.changes();
+}
+
 }  // namespace geoframe::db

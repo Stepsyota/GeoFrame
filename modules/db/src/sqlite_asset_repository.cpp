@@ -205,16 +205,27 @@ std::optional<core::Asset> SqliteAssetRepository::find_by_source_path(
 }
 
 std::vector<core::Asset> SqliteAssetRepository::list(const std::size_t limit,
-                                                     const std::size_t offset) {
+                                                     const std::size_t offset,
+                                                     const std::optional<core::AssetStatus> status) {
     if (limit > static_cast<std::size_t>(std::numeric_limits<std::int64_t>::max()) ||
         offset > static_cast<std::size_t>(std::numeric_limits<std::int64_t>::max())) {
         throw std::invalid_argument("Pagination value exceeds SQLite integer range");
     }
 
-    auto statement = database.prepare("SELECT " + std::string{kAssetColumns} +
-                                      " FROM assets ORDER BY id LIMIT ? OFFSET ?");
-    statement.bind(1, static_cast<std::int64_t>(limit));
-    statement.bind(2, static_cast<std::int64_t>(offset));
+    std::string sql = "SELECT " + std::string{kAssetColumns} + " FROM assets";
+    if (status.has_value()) {
+        sql += " WHERE status = ?";
+    }
+    // NULLs last so undated media doesn't crowd the top; within the same date sort newest first
+    sql += " ORDER BY CASE WHEN captured_at IS NULL THEN 1 ELSE 0 END, captured_at DESC, id DESC LIMIT ? OFFSET ?";
+
+    auto statement = database.prepare(sql);
+    int param = 1;
+    if (status.has_value()) {
+        statement.bind(param++, to_string(*status));
+    }
+    statement.bind(param++, static_cast<std::int64_t>(limit));
+    statement.bind(param,   static_cast<std::int64_t>(offset));
 
     std::vector<core::Asset> assets;
     assets.reserve(limit);

@@ -5,22 +5,29 @@ import { MediaCard } from '../components/MediaCard'
 import { useAssets } from '../hooks/useAssets'
 import type { AssetSummary } from '../types/asset'
 
-const dayKey = (asset: AssetSummary) => asset.capturedAt?.slice(0, 10) ?? 'unknown'
+/** Returns a sortable "YYYY-MM-DD" string (or "unknown") for grouping. */
+const dayKey = (asset: AssetSummary): string => {
+  const ca = asset.capturedAt
+  if (!ca || typeof ca !== 'string') return 'unknown'
+  // Normalise EXIF "YYYY:MM:DD ..." → "YYYY-MM-DD"
+  return ca.slice(0, 10).replace(/:/g, '-')
+}
 
-const dayTitle = (key: string) => {
-  if (key === 'unknown') {
-    return 'Date unknown'
-  }
+const dayTitle = (key: unknown): string => {
+  if (typeof key !== 'string' || key === 'unknown') return 'Date unknown'
+  const date = new Date(`${key}T12:00:00`)
+  if (isNaN(date.getTime())) return key // unparsable → show raw
   return new Intl.DateTimeFormat('en', {
     weekday: 'long',
     day: 'numeric',
     month: 'long',
     year: 'numeric',
-  }).format(new Date(`${key}T12:00:00`))
+  }).format(date)
 }
 
-const groupByDay = (assets: AssetSummary[]) => {
+const groupByDay = (assets: AssetSummary[] | undefined): Map<string, AssetSummary[]> => {
   const groups = new Map<string, AssetSummary[]>()
+  if (!Array.isArray(assets)) return groups
   assets.forEach((asset) => {
     const key = dayKey(asset)
     const group = groups.get(key)
@@ -55,13 +62,14 @@ export const GalleryPage = () => {
             <h2>Could not load your library</h2>
             <p>{error}</p>
             <p className="state-hint">
-              Start GeoFrame backend or run <code>npm run dev:demo</code>.
+              Make sure GeoFrame backend is running, or use{' '}
+              <code>npm run dev:demo</code> for demo mode.
             </p>
           </div>
         </section>
       )}
 
-      {data?.items.length === 0 && (
+      {!loading && !error && data && (data.items ?? []).length === 0 && (
         <section className="state-card">
           <ImageOff size={30} />
           <div>
