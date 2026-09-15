@@ -127,6 +127,7 @@ Download → Install → "Where is your library?" → Start
 
 ## Документация
 
+- [**Запуск и разработка**](docs/SETUP.md) — сборка, зависимости, CLI-команды
 - [Текущая задача и MVP](docs/CURRENT.md) — что делаем сейчас
 - [Архитектура](docs/ARCHITECTURE.md) — компоненты, API, модули
 - [Coding guidelines](docs/CODING.md) — стиль, PR, error handling
