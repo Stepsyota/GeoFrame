@@ -76,7 +76,8 @@ Python-код не развиваем. Используем как reference п�
 
 #### Web UI
 
-- [ ] Галерея (mobile-first, desktop тоже)
+- [x] React/Vite-каркас галереи (mobile-first, desktop тоже; demo mode)
+- [ ] Подключение галереи к реальному HTTP API
 - [ ] Просмотр фото: дата, место, камера, полный EXIF, скачать оригинал
 - [ ] Избранное
 - [ ] Удаление → Trash
@@ -184,7 +185,7 @@ GeoFrame читает source folder. Внешние изменения файл�
 5. **Worker pool + SHA-256 + image EXIF** — OpenSSL, Exiv2 ✅
 6. **Preview generation** — thumbnails и previews через ffmpeg ✅
 7. **HTTP API** — REST + WebSocket + TLS
-8. **React gallery** — минимальный UI
+8. **React gallery** — каркас и demo mode ✅; подключение после HTTP API
 9. **Map** — GeoJSON endpoint + MapLibre
 10. **Duplicates + series** — детекция + UI
 11. **Удалить Python-прототип**

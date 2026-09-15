@@ -317,7 +317,7 @@ web/
 | Language | TypeScript |
 | Build | Vite |
 | Map | MapLibre GL |
-| Styling | TBD (CSS modules / Tailwind) |
+| Styling | Plain CSS, без UI framework на старте |
 
 Кластеризация для карты — на C++ (GeoJSON endpoint), MapLibre только рендерит.
 

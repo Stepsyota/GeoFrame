@@ -131,6 +131,7 @@ Download → Install → "Where is your library?" → Start
 - [Архитектура](docs/ARCHITECTURE.md) — компоненты, API, модули
 - [Coding guidelines](docs/CODING.md) — стиль, PR, error handling
 - [Дорожная карта](docs/ROADMAP.md) — будущие фичи
+- [Frontend](web/README.md) — запуск React UI и demo mode
 
 ## Лицензия
 

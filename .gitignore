@@ -1,5 +1,9 @@
 Photos/
 
+# Frontend
+web/node_modules/
+web/dist/
+web/coverage/
 
 # created by virtualenv automatically
 
