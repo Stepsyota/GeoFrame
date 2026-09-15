@@ -135,13 +135,14 @@ void generate_video_poster(const std::filesystem::path& source,
 
     const std::vector<std::string> args = {
         "ffmpeg",
-        "-y",                           // overwrite
-        "-ss", "0",                     // seek to start
+        "-hide_banner", "-loglevel", "error", "-nostdin", "-y",
+        "-ss", "0",
         "-i", source.string(),
-        "-filter_complex", filter_complex,  // works with complex-decoder formats (HEIC, HEVC)
+        "-filter_complex", filter_complex,
         "-map", "[out]",
-        "-frames:v", "1",               // single frame
-        "-q:v", "3",                    // JPEG quality
+        "-frames:v", "1",
+        "-update", "1",
+        "-q:v", "3",
         tmp.string(),
     };
 

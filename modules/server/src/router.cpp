@@ -8,6 +8,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <system_error>
 
 namespace geoframe::server {
 
@@ -88,6 +89,20 @@ std::string exif_to_iso(const std::string& exif) {
     return iso;
 }
 
+/** Append ?v=<size>:<mtime> so browsers fetch a new file after regeneration. */
+std::string media_url_with_version(const std::int64_t id, const std::string_view kind,
+                                   const std::filesystem::path& path) {
+    std::string url = "/api/assets/" + std::to_string(id) + "/" + std::string{kind};
+    std::error_code ec;
+    const auto size = std::filesystem::file_size(path, ec);
+    const auto mtime = std::filesystem::last_write_time(path, ec);
+    if (!ec) {
+        url += "?v=" + std::to_string(size) + ':'
+             + std::to_string(mtime.time_since_epoch().count());
+    }
+    return url;
+}
+
 json asset_to_json(const core::Asset& a) {
     json obj;
     obj["id"] = a.id;
@@ -132,12 +147,12 @@ json asset_to_json(const core::Asset& a) {
     }
 
     if (a.thumbnail_path.has_value()) {
-        obj["thumbnailUrl"] = "/api/assets/" + std::to_string(a.id) + "/thumbnail";
+        obj["thumbnailUrl"] = media_url_with_version(a.id, "thumbnail", *a.thumbnail_path);
     } else {
         obj["thumbnailUrl"] = nullptr;
     }
     if (a.preview_path.has_value()) {
-        obj["previewUrl"] = "/api/assets/" + std::to_string(a.id) + "/preview";
+        obj["previewUrl"] = media_url_with_version(a.id, "preview", *a.preview_path);
     } else {
         obj["previewUrl"] = nullptr;
     }

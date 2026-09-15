@@ -19,6 +19,7 @@ public:
     void mark_failed(std::int64_t id, std::string_view error) override;
     int recover_interrupted() override;
     int retry_failed() override;
+    void requeue(std::int64_t asset_id, core::JobType type) override;
 
 private:
     Database& database;

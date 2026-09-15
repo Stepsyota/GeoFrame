@@ -13,6 +13,8 @@ std::string_view to_string(const core::JobType type) {
             return "hash";
         case core::JobType::Metadata:
             return "metadata";
+        case core::JobType::VideoMetadata:
+            return "video_metadata";
         case core::JobType::Thumbnail:
             return "thumbnail";
         case core::JobType::Preview:
@@ -31,6 +33,9 @@ core::JobType type_from_string(const std::string_view value) {
     }
     if (value == "metadata") {
         return core::JobType::Metadata;
+    }
+    if (value == "video_metadata") {
+        return core::JobType::VideoMetadata;
     }
     if (value == "thumbnail") {
         return core::JobType::Thumbnail;
@@ -147,6 +152,19 @@ int SqliteJobRepository::retry_failed() {
         "UPDATE jobs SET status = 'pending', started_at = NULL, error = NULL "
         "WHERE status = 'failed'");
     return database.changes();
+}
+
+void SqliteJobRepository::requeue(const std::int64_t asset_id, const core::JobType type) {
+    auto statement = database.prepare(
+        "UPDATE jobs SET status = 'pending', started_at = NULL, completed_at = NULL, "
+        "error = NULL, attempts = 0 "
+        "WHERE asset_id = ? AND type = ?");
+    statement.bind(1, asset_id);
+    statement.bind(2, to_string(type));
+    statement.step();
+    if (database.changes() == 0) {
+        enqueue(asset_id, type);
+    }
 }
 
 }  // namespace geoframe::db

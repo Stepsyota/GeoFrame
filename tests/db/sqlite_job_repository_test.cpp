@@ -79,6 +79,28 @@ TEST_F(SqliteJobRepositoryTest, RecoversInterruptedJob) {
     EXPECT_EQ(reclaimed->attempts, 2);
 }
 
+TEST_F(SqliteJobRepositoryTest, EnqueuesVideoMetadataJob) {
+    jobs.enqueue(asset_id, core::JobType::VideoMetadata);
+
+    const auto claimed = jobs.claim_next();
+    ASSERT_TRUE(claimed.has_value());
+    EXPECT_EQ(claimed->type, core::JobType::VideoMetadata);
+}
+
+TEST_F(SqliteJobRepositoryTest, RequeuesDoneJob) {
+    jobs.enqueue(asset_id, core::JobType::Preview);
+    const auto claimed = jobs.claim_next();
+    ASSERT_TRUE(claimed.has_value());
+    jobs.mark_done(claimed->id);
+
+    jobs.requeue(asset_id, core::JobType::Preview);
+
+    const auto reclaimed = jobs.claim_next();
+    ASSERT_TRUE(reclaimed.has_value());
+    EXPECT_EQ(reclaimed->type, core::JobType::Preview);
+    EXPECT_EQ(reclaimed->attempts, 1);
+}
+
 TEST_F(SqliteJobRepositoryTest, RejectsUnknownJob) {
     EXPECT_THROW(jobs.mark_done(42), std::out_of_range);
 }

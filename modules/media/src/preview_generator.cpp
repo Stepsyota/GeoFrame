@@ -2,7 +2,9 @@
 
 #include "media/process_runner.hpp"
 
+#include <algorithm>
 #include <chrono>
+#include <cctype>
 #include <iostream>
 #include <stdexcept>
 #include <string>
@@ -12,8 +14,6 @@
 namespace geoframe::media {
 
 namespace {
-
-// ── Tool helpers ──────────────────────────────────────────────────────────
 
 /** Publish tmp → destination atomically; removes tmp on error. */
 void publish(const std::filesystem::path& tmp, const std::filesystem::path& destination) {
@@ -27,36 +27,43 @@ void publish(const std::filesystem::path& tmp, const std::filesystem::path& dest
     }
 }
 
-/** Cleans up leftover temp file without throwing. */
 void remove_tmp(const std::filesystem::path& tmp) noexcept {
     std::error_code ec;
     std::filesystem::remove(tmp, ec);
 }
 
-// ── Strategy 1: ffmpeg ───────────────────────────────────────────────────
+/** Scale filter: limit the long edge to max_size, keep aspect ratio. */
+std::string scale_filter_complex(const int max_size) {
+    const std::string s = std::to_string(max_size);
+    return "[0:v]scale='if(gt(iw,ih)," + s + ",-2)':'if(gt(iw,ih),-2," + s + ")'[out]";
+}
 
-bool try_ffmpeg(const std::filesystem::path& source, const std::filesystem::path& tmp,
-                const int max_size, const std::string& ffmpeg_binary) {
-    const std::string s   = std::to_string(max_size);
-    // -filter_complex required for HEIC: modern ffmpeg uses an internal complex
-    // filtergraph for HEVC-based formats, conflicting with -vf (simple filter).
-    const std::string fc  =
-        "[0:v]scale='if(gt(iw,ih)," + s + ",-2)':'if(gt(iw,ih),-2," + s + ")'[out]";
+bool is_heif_file(const std::filesystem::path& source) {
+    auto ext = source.extension().string();
+    std::transform(ext.begin(), ext.end(), ext.begin(),
+                   [](const unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return ext == ".heic" || ext == ".heif" || ext == ".avif";
+}
 
+// ── ffmpeg scale (works on already-decoded JPEG/PNG/etc.) ─────────────────
+
+bool try_ffmpeg_scale(const std::filesystem::path& source, const std::filesystem::path& tmp,
+                      const int max_size, const std::string& ffmpeg_binary) {
     const std::vector<std::string> args{
         ffmpeg_binary,
         "-hide_banner", "-loglevel", "error", "-nostdin", "-y",
         "-i", source.string(),
-        "-filter_complex", fc,
+        "-filter_complex", scale_filter_complex(max_size),
         "-map", "[out]",
         "-frames:v", "1",
+        "-update", "1",
         "-q:v", "3",
         tmp.string(),
     };
 
     const auto result = run_process(args, std::chrono::minutes{3});
     if (result.exit_code != 0) {
-        std::clog << "[preview] ffmpeg failed for " << source.filename().string()
+        std::clog << "[preview] ffmpeg scale failed for " << source.filename().string()
                   << ": " << result.error << '\n';
         remove_tmp(tmp);
         return false;
@@ -64,20 +71,41 @@ bool try_ffmpeg(const std::filesystem::path& source, const std::filesystem::path
     return true;
 }
 
-// ── Strategy 2: ImageMagick (magick / convert) ────────────────────────────
+// ── HEIF/HEIC: libheif decode → ffmpeg scale ─────────────────────────────
 //
-// Handles RAW formats (DNG, NEF, CR2, ARW, …) via dcraw delegate.
-// ImageMagick 7 prefers the "magick" binary; if not found we fall back
-// to the legacy "convert" alias (still present but shows a deprecation warning).
+// ffmpeg's HEIC demuxer reads the tile-grid stream and produces a cropped,
+// zoomed fragment.  heif-convert assembles the full image correctly.
+
+bool try_heif_convert(const std::filesystem::path& source, const std::filesystem::path& tmp,
+                      const int max_size) {
+    auto decoded = tmp;
+    decoded.replace_filename(tmp.stem().string() + ".decode.jpg");
+
+    const std::vector<std::string> decode_args{
+        "heif-convert",
+        source.string(),
+        decoded.string(),
+    };
+
+    const auto decode = run_process(decode_args, std::chrono::minutes{3});
+    if (decode.exit_code != 0) {
+        std::clog << "[preview] heif-convert failed for " << source.filename().string()
+                  << ": " << decode.error << '\n';
+        remove_tmp(decoded);
+        return false;
+    }
+
+    const bool scaled = try_ffmpeg_scale(decoded, tmp, max_size, "ffmpeg");
+    remove_tmp(decoded);
+    return scaled;
+}
+
+// ── ImageMagick (magick / convert) ────────────────────────────────────────
 
 bool try_imagemagick(const std::filesystem::path& source, const std::filesystem::path& tmp,
                      const int max_size) {
-    // '[0]' selects the first frame/layer (important for multi-image formats).
-    // -auto-orient  — respect EXIF rotation.
-    // WxH>          — shrink only if larger than the requested size.
     const std::string geometry = std::to_string(max_size) + "x" + std::to_string(max_size) + ">";
 
-    // Prefer IM7 "magick" binary; older systems still ship "convert".
     std::string binary = "magick";
     {
         const auto probe = run_process({"magick", "--version"}, std::chrono::seconds{5});
@@ -89,10 +117,10 @@ bool try_imagemagick(const std::filesystem::path& source, const std::filesystem:
     const std::vector<std::string> args{
         binary,
         "-auto-orient",
-        source.string() + "[0]",  // first frame/layer
+        source.string() + "[0]",
         "-resize", geometry,
         "-quality", "85",
-        "jpg:" + tmp.string(),    // explicit format so extension doesn't matter
+        "jpg:" + tmp.string(),
     };
 
     const auto result = run_process(args, std::chrono::minutes{3});
@@ -105,17 +133,16 @@ bool try_imagemagick(const std::filesystem::path& source, const std::filesystem:
     return true;
 }
 
-// ── Strategy 3: vips thumbnail ───────────────────────────────────────────
+// ── vips thumbnail ───────────────────────────────────────────────────────
 
 bool try_vips(const std::filesystem::path& source, const std::filesystem::path& tmp,
               const int max_size) {
-    // vips thumbnail <src> <dst> <size>  (size = max of width/height)
     const std::vector<std::string> args{
         "vips", "thumbnail",
         source.string(),
         tmp.string(),
         std::to_string(max_size),
-        "--size", "down",   // shrink only
+        "--size", "down",
     };
 
     const auto result = run_process(args, std::chrono::minutes{3});
@@ -129,8 +156,6 @@ bool try_vips(const std::filesystem::path& source, const std::filesystem::path& 
 }
 
 }  // namespace
-
-// ── Public API ────────────────────────────────────────────────────────────
 
 void generate_image_preview(const std::filesystem::path& source,
                             const std::filesystem::path& destination, const int max_size,
@@ -150,21 +175,25 @@ void generate_image_preview(const std::filesystem::path& source,
     auto tmp = destination;
     tmp.replace_filename(destination.stem().string() + ".tmp.jpg");
 
-    if (try_ffmpeg(source, tmp, max_size, ffmpeg_binary)) {
+    // HEIC/HEIF: ffmpeg tile-grid decode is broken — use libheif first.
+    if (is_heif_file(source)) {
+        if (try_heif_convert(source, tmp, max_size)) {
+            publish(tmp, destination);
+            return;
+        }
+        std::clog << "[preview] heif-convert failed for " << source.filename().string()
+                  << "; trying fallbacks\n";
+    }
+
+    if (try_ffmpeg_scale(source, tmp, max_size, ffmpeg_binary)) {
         publish(tmp, destination);
         return;
     }
-
-    std::clog << "[preview] ffmpeg failed for " << source.filename().string()
-              << "; trying ImageMagick convert\n";
 
     if (try_imagemagick(source, tmp, max_size)) {
         publish(tmp, destination);
         return;
     }
-
-    std::clog << "[preview] convert failed for " << source.filename().string()
-              << "; trying vips\n";
 
     if (try_vips(source, tmp, max_size)) {
         publish(tmp, destination);
@@ -172,7 +201,7 @@ void generate_image_preview(const std::filesystem::path& source,
     }
 
     throw std::runtime_error(
-        "All preview tools (ffmpeg, convert, vips) failed for: " + source.string());
+        "All preview tools (heif-convert/ffmpeg, convert, vips) failed for: " + source.string());
 }
 
 }  // namespace geoframe::media

@@ -157,6 +157,58 @@ void check_disk_space(const std::filesystem::path& path) {
     }
 }
 
+// ── Stale preview recovery ──────────────────────────────────────────────────
+
+/** Re-queue preview jobs when the thumbnail was regenerated more recently. */
+int requeue_stale_previews(core::IAssetRepository& assets, core::IJobRepository& jobs) {
+    int requeued = 0;
+    std::size_t offset = 0;
+    constexpr std::size_t kBatch = 200;
+
+    while (true) {
+        const auto batch =
+            assets.list(kBatch, offset, core::AssetStatus::Active);
+        if (batch.empty()) {
+            break;
+        }
+
+        for (const auto& asset : batch) {
+            if (asset.media_type != core::MediaType::Image) {
+                continue;
+            }
+            if (!asset.thumbnail_path.has_value() || !asset.preview_path.has_value()) {
+                continue;
+            }
+
+            std::error_code ec;
+            const auto thumb_time =
+                std::filesystem::last_write_time(*asset.thumbnail_path, ec);
+            if (ec) {
+                continue;
+            }
+            const auto preview_time =
+                std::filesystem::last_write_time(*asset.preview_path, ec);
+            if (ec) {
+                jobs.requeue(asset.id, core::JobType::Preview);
+                ++requeued;
+                continue;
+            }
+
+            if (thumb_time > preview_time) {
+                jobs.requeue(asset.id, core::JobType::Preview);
+                ++requeued;
+            }
+        }
+
+        if (batch.size() < kBatch) {
+            break;
+        }
+        offset += kBatch;
+    }
+
+    return requeued;
+}
+
 // ── Commands ────────────────────────────────────────────────────────────────
 
 int cmd_serve(const Args& args) {
@@ -246,6 +298,11 @@ int cmd_serve(const Args& args) {
     const int retried = job_repo.retry_failed();
     if (retried > 0) {
         spdlog::info("Reset {} previously failed jobs for retry", retried);
+    }
+
+    const int stale_previews = requeue_stale_previews(asset_repo, job_repo);
+    if (stale_previews > 0) {
+        spdlog::info("Re-queued {} stale preview jobs (thumbnail newer than preview)", stale_previews);
     }
 
     // If source is configured, trigger an immediate scan

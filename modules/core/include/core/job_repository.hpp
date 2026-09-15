@@ -23,6 +23,8 @@ public:
     virtual int recover_interrupted() = 0;
     /** Reset all Failed jobs back to Pending so they are retried. */
     virtual int retry_failed() = 0;
+    /** Reset a done/failed job back to Pending, or insert if missing. */
+    virtual void requeue(std::int64_t asset_id, JobType type) = 0;
 };
 
 }  // namespace geoframe::core

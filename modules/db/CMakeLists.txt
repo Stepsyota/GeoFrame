@@ -12,6 +12,7 @@ file(READ "${PROJECT_SOURCE_DIR}/migrations/003_allow_duplicate_hashes.sql" GEOF
 file(READ "${PROJECT_SOURCE_DIR}/migrations/004_asset_previews.sql" GEOFRAME_MIGRATION_004)
 file(READ "${PROJECT_SOURCE_DIR}/migrations/005_video_fields.sql" GEOFRAME_MIGRATION_005)
 file(READ "${PROJECT_SOURCE_DIR}/migrations/006_live_photos.sql" GEOFRAME_MIGRATION_006)
+file(READ "${PROJECT_SOURCE_DIR}/migrations/007_video_metadata_job.sql" GEOFRAME_MIGRATION_007)
 configure_file(
     "${PROJECT_SOURCE_DIR}/cmake/migrations.hpp.in"
     "${CMAKE_CURRENT_BINARY_DIR}/generated/db/migrations.hpp"

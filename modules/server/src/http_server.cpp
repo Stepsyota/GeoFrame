@@ -96,7 +96,17 @@ void send_file(Stream& stream,
 
     http::response<http::file_body> res{http::status::ok, req.version()};
     res.set(http::field::content_type, ct);
-    res.set(http::field::cache_control, "max-age=3600");
+    res.set(http::field::cache_control, "private, max-age=86400, must-revalidate");
+    {
+        std::error_code mtime_ec;
+        const auto mtime = std::filesystem::last_write_time(fp, mtime_ec);
+        if (!mtime_ec) {
+            const auto tag = std::to_string(
+                std::chrono::duration_cast<std::chrono::seconds>(mtime.time_since_epoch())
+                    .count());
+            res.set(http::field::etag, "\"" + tag + "\"");
+        }
+    }
     res.body() = std::move(file);
     res.keep_alive(req.keep_alive());
     res.prepare_payload();

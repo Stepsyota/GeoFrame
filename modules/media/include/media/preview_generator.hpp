@@ -9,9 +9,8 @@ namespace geoframe::media {
  * @brief Генерирует JPEG-копию изображения с ограничением max_size по длинной стороне.
  *
  * Стратегия:
- *   1. ffmpeg  — быстро, поддерживает JPEG/PNG/WebP/TIFF и (с libheif) HEIC
- *   2. convert — ImageMagick; поддерживает HEIC, RAW, TIFF, WebP и многое другое
- *   3. vips    — самый широкий охват форматов как последний резерв
+ *   HEIC/HEIF/AVIF: heif-convert (полный кадр) → ffmpeg scale
+ *   Остальное:      ffmpeg scale → ImageMagick → vips
  *
  * @throws std::runtime_error если все три инструмента провалились.
  */
