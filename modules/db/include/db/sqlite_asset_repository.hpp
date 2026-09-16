@@ -17,8 +17,10 @@ public:
     std::optional<core::Asset> find_by_source_path(
         const std::filesystem::path& source_path) override;
     std::vector<core::Asset> list(std::size_t limit, std::size_t offset,
-                                  std::optional<core::AssetStatus> status = std::nullopt) override;
-    std::int64_t count(core::AssetStatus status = core::AssetStatus::Active) override;
+                                  std::optional<core::AssetStatus> status = std::nullopt,
+                                  std::optional<bool> favorite = std::nullopt) override;
+    std::int64_t count(core::AssetStatus status = core::AssetStatus::Active,
+                       std::optional<bool> favorite = std::nullopt) override;
     void set_sha256(std::int64_t id, std::string_view sha256) override;
     void set_metadata(std::int64_t id, const core::AssetMetadata& metadata) override;
     void set_video_metadata(std::int64_t id, const core::VideoMetadata& metadata) override;

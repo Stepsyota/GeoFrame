@@ -521,28 +521,107 @@ button:focus-visible {
   white-space: nowrap;
 }
 
+.lightbox-actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.lightbox-action,
 .lightbox-close {
   display: grid;
-  flex-shrink: 0;
   width: 40px;
   height: 40px;
   place-items: center;
   border: 1px solid #3a4036;
   border-radius: 11px;
+  color: #e5e9e1;
   background: rgba(25, 28, 23, 0.85);
   cursor: pointer;
+  text-decoration: none;
+}
+
+.lightbox-action.active {
+  border-color: #b4d28d;
+  color: #f2b8c6;
+}
+
+.lightbox-action.danger {
+  color: #efb4b4;
+}
+
+.lightbox-action:disabled,
+.lightbox-close:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.lightbox-body {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  flex: 1;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: 0;
+  min-height: 0;
 }
 
 .lightbox-stage {
   position: relative;
-  z-index: 1;
   display: flex;
-  flex: 1;
   align-items: center;
   justify-content: center;
   min-height: 0;
   padding: 8px 56px 24px;
   padding-bottom: max(24px, env(safe-area-inset-bottom));
+}
+
+.lightbox-panel {
+  overflow: auto;
+  padding: 18px 20px 24px;
+  border-left: 1px solid #2d332b;
+  background: rgba(16, 18, 15, 0.72);
+}
+
+.lightbox-panel h2 {
+  margin: 0 0 14px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #9aa193;
+}
+
+.lightbox-meta {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+}
+
+.lightbox-meta div {
+  display: grid;
+  gap: 3px;
+}
+
+.lightbox-meta dt {
+  color: #7f877b;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.lightbox-meta dd {
+  margin: 0;
+  color: #e5e9e1;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.lightbox-hash {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
 }
 
 .lightbox-media {
@@ -578,6 +657,19 @@ button:focus-visible {
 
 .lightbox-nav-next {
   right: 12px;
+}
+
+@media (max-width: 900px) {
+  .lightbox-body {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+
+  .lightbox-panel {
+    border-left: 0;
+    border-top: 1px solid #2d332b;
+    max-height: 34vh;
+  }
 }
 
 @media (max-width: 760px) {

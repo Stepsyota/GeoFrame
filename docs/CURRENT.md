@@ -24,14 +24,9 @@
 3. Удалить Python-прототип, начать C++ с нуля
 4. Реализовать MVP
 
-## Что было в Python-прототипе (reference, затем удалить)
+## Python-прототип
 
-```
-app/                  # scanner, metadata, hash, CRUD — логика переносится в C++
-tests/                # тестовые сценарии — reference для GTest
-```
-
-Python-код не развиваем. Используем как reference при портировании, затем удаляем.
+Удалён. Вся логика (scanner, metadata, hash, CRUD) перенесена в C++ модули.
 
 ## Технологический стек (зафиксирован)
 
@@ -189,8 +184,9 @@ GeoFrame читает source folder. Внешние изменения файл�
 9. **React gallery** — каркас, demo mode, real API + pagination ✅
 10. **WebSocket progress** — live прогресс индексации (`/ws/events`) ✅
 11. **Map** — GeoJSON endpoint + MapLibre ✅
-12. **Duplicates + series** — детекция + UI — следующий шаг
-13. **Удалить Python-прототип**
+12. **Duplicates + series** — детекция + UI ✅
+13. **Удалить Python-прототип** ✅
+14. **Lightbox + избранное + trash** — следующий шаг
 
 ## Критерий готовности MVP
 

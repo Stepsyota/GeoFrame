@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { getAssets } from '../api/assets'
-import type { AssetPage, AssetSummary } from '../types/asset'
+import type { AssetListOptions, AssetPage, AssetSummary } from '../types/asset'
 
 const PAGE_SIZE = 50
 
@@ -13,9 +13,12 @@ interface AssetsState {
   error: string | null
   hasMore: boolean
   loadMore: () => void
+  refresh: () => void
+  updateItem: (id: number, patch: Partial<AssetSummary>) => void
+  removeItem: (id: number) => void
 }
 
-export const useAssets = (): AssetsState => {
+export const useAssets = (options?: AssetListOptions): AssetsState => {
   const [items, setItems] = useState<AssetSummary[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -23,6 +26,8 @@ export const useAssets = (): AssetsState => {
   const [error, setError] = useState<string | null>(null)
   const offsetRef = useRef(0)
   const loadingMoreRef = useRef(false)
+  const listStatus = options?.status
+  const listFavorite = options?.favorite
 
   const applyPage = useCallback((page: AssetPage, append: boolean) => {
     if (!page || !Array.isArray(page.items)) {
@@ -33,26 +38,34 @@ export const useAssets = (): AssetsState => {
     offsetRef.current = append ? offsetRef.current + page.items.length : page.items.length
   }, [])
 
-  useEffect(() => {
-    const controller = new AbortController()
-    offsetRef.current = 0
-
-    getAssets(PAGE_SIZE, 0, controller.signal)
-      .then((page) => {
+  const loadInitial = useCallback(
+    (signal?: AbortSignal) => {
+      offsetRef.current = 0
+      return getAssets(PAGE_SIZE, 0, signal, {
+        status: listStatus,
+        favorite: listFavorite,
+      }).then((page) => {
         applyPage(page, false)
         setLoading(false)
         setError(null)
       })
-      .catch((err: unknown) => {
-        if (!controller.signal.aborted) {
-          const message = err instanceof Error ? err.message : 'Unknown API error'
-          setError(message)
-          setLoading(false)
-        }
-      })
+    },
+    [applyPage, listFavorite, listStatus],
+  )
+
+  useEffect(() => {
+    const controller = new AbortController()
+
+    loadInitial(controller.signal).catch((err: unknown) => {
+      if (!controller.signal.aborted) {
+        const message = err instanceof Error ? err.message : 'Unknown API error'
+        setError(message)
+        setLoading(false)
+      }
+    })
 
     return () => controller.abort()
-  }, [applyPage])
+  }, [loadInitial])
 
   const loadMore = useCallback(() => {
     if (loadingMoreRef.current || loading || items.length >= total) {
@@ -62,7 +75,10 @@ export const useAssets = (): AssetsState => {
     loadingMoreRef.current = true
     setLoadingMore(true)
 
-    getAssets(PAGE_SIZE, offsetRef.current)
+    getAssets(PAGE_SIZE, offsetRef.current, undefined, {
+      status: listStatus,
+      favorite: listFavorite,
+    })
       .then((page) => {
         applyPage(page, true)
       })
@@ -74,7 +90,25 @@ export const useAssets = (): AssetsState => {
         loadingMoreRef.current = false
         setLoadingMore(false)
       })
-  }, [applyPage, items.length, loading, total])
+  }, [applyPage, items.length, listFavorite, listStatus, loading, total])
+
+  const refresh = useCallback(() => {
+    setLoading(true)
+    void loadInitial().catch((err: unknown) => {
+      const message = err instanceof Error ? err.message : 'Unknown API error'
+      setError(message)
+      setLoading(false)
+    })
+  }, [loadInitial])
+
+  const updateItem = useCallback((id: number, patch: Partial<AssetSummary>) => {
+    setItems((prev) => prev.map((item) => (item.id === id ? { ...item, ...patch } : item)))
+  }, [])
+
+  const removeItem = useCallback((id: number) => {
+    setItems((prev) => prev.filter((item) => item.id !== id))
+    setTotal((prev) => Math.max(0, prev - 1))
+  }, [])
 
   return {
     items,
@@ -84,5 +118,8 @@ export const useAssets = (): AssetsState => {
     error,
     hasMore: items.length < total,
     loadMore,
+    refresh,
+    updateItem,
+    removeItem,
   }
 }

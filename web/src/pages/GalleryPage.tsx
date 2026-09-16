@@ -57,7 +57,8 @@ interface GalleryPageProps {
 }
 
 export const GalleryPage = ({ onNavigate }: GalleryPageProps) => {
-  const { items, total, loading, loadingMore, error, hasMore, loadMore } = useAssets()
+  const { items, total, loading, loadingMore, error, hasMore, loadMore, updateItem, removeItem } =
+    useAssets()
   const { progress, active: progressActive } = useScanProgress()
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const loadMoreRef = useRef<HTMLDivElement | null>(null)
@@ -160,6 +161,8 @@ export const GalleryPage = ({ onNavigate }: GalleryPageProps) => {
           onClose={closeLightbox}
           onPrev={goPrev}
           onNext={goNext}
+          onFavoriteChange={(favorite) => updateItem(selectedAsset.id, { favorite })}
+          onTrash={() => removeItem(selectedAsset.id)}
         />
       )}
     </AppShell>

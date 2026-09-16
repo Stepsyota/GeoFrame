@@ -206,15 +206,29 @@ std::optional<core::Asset> SqliteAssetRepository::find_by_source_path(
 
 std::vector<core::Asset> SqliteAssetRepository::list(const std::size_t limit,
                                                      const std::size_t offset,
-                                                     const std::optional<core::AssetStatus> status) {
+                                                     const std::optional<core::AssetStatus> status,
+                                                     const std::optional<bool> favorite) {
     if (limit > static_cast<std::size_t>(std::numeric_limits<std::int64_t>::max()) ||
         offset > static_cast<std::size_t>(std::numeric_limits<std::int64_t>::max())) {
         throw std::invalid_argument("Pagination value exceeds SQLite integer range");
     }
 
     std::string sql = "SELECT " + std::string{kAssetColumns} + " FROM assets";
+    std::vector<std::string> conditions;
     if (status.has_value()) {
-        sql += " WHERE status = ?";
+        conditions.push_back("status = ?");
+    }
+    if (favorite.has_value()) {
+        conditions.push_back("favorite = ?");
+    }
+    if (!conditions.empty()) {
+        sql += " WHERE ";
+        for (std::size_t i = 0; i < conditions.size(); ++i) {
+            if (i > 0) {
+                sql += " AND ";
+            }
+            sql += conditions[i];
+        }
     }
     // NULLs last so undated media doesn't crowd the top; within the same date sort newest first
     sql += " ORDER BY CASE WHEN captured_at IS NULL THEN 1 ELSE 0 END, captured_at DESC, id DESC LIMIT ? OFFSET ?";
@@ -223,6 +237,9 @@ std::vector<core::Asset> SqliteAssetRepository::list(const std::size_t limit,
     int param = 1;
     if (status.has_value()) {
         statement.bind(param++, to_string(*status));
+    }
+    if (favorite.has_value()) {
+        statement.bind(param++, static_cast<std::int64_t>(*favorite));
     }
     statement.bind(param++, static_cast<std::int64_t>(limit));
     statement.bind(param,   static_cast<std::int64_t>(offset));
@@ -382,10 +399,18 @@ std::vector<core::GeoAsset> SqliteAssetRepository::list_geo_points(
     return points;
 }
 
-std::int64_t SqliteAssetRepository::count(const core::AssetStatus status) {
-    auto statement =
-        database.prepare("SELECT COUNT(*) FROM assets WHERE status = ?");
+std::int64_t SqliteAssetRepository::count(const core::AssetStatus status,
+                                         const std::optional<bool> favorite) {
+    std::string sql = "SELECT COUNT(*) FROM assets WHERE status = ?";
+    if (favorite.has_value()) {
+        sql += " AND favorite = ?";
+    }
+
+    auto statement = database.prepare(sql);
     statement.bind(1, to_string(status));
+    if (favorite.has_value()) {
+        statement.bind(2, static_cast<std::int64_t>(*favorite));
+    }
     if (!statement.step()) {
         throw std::runtime_error("COUNT query returned no rows");
     }

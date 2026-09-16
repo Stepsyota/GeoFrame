@@ -186,12 +186,9 @@ modules/
   cli/                пока только базовый CLI / version
 tests/                 C++ unit и integration tests
 web/                   React приложение
-app/                   старый Python/Telegram prototype
-requirements.txt       зависимости старого Python prototype
 ```
 
-Python-прототип пока физически присутствует. Не смешивать его удаление с несвязанной
-фичей; удалить отдельным коммитом после переноса нужных сценариев.
+Python/Telegram prototype удалён; логика перенесена в C++ модули.
 
 ## 6. Что уже реализовано
 

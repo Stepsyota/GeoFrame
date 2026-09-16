@@ -1,6 +1,12 @@
 export type MediaType = 'image' | 'video'
 export type AssetStatus = 'active' | 'trashed'
 
+export interface AssetGps {
+  lat: number
+  lon: number
+  alt: number | null
+}
+
 export interface AssetSummary {
   id: number
   originalFilename: string
@@ -12,6 +18,20 @@ export interface AssetSummary {
   favorite: boolean
   thumbnailUrl: string | null
   previewUrl: string | null
+}
+
+export interface AssetDetail extends AssetSummary {
+  camera: string | null
+  gps: AssetGps | null
+  sizeBytes: number
+  sha256: string | null
+  durationSeconds: number | null
+  videoCodec: string | null
+}
+
+export interface AssetListOptions {
+  status?: AssetStatus
+  favorite?: boolean
 }
 
 export interface AssetPage {

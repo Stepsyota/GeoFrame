@@ -17,7 +17,7 @@ const navigation: Array<{ id: AppPage; label: string; icon: typeof Images; enabl
   { id: 'map', label: 'Map', icon: Map, enabled: true },
   { id: 'duplicates', label: 'Duplicates', icon: Copy, enabled: true },
   { id: 'series', label: 'Series', icon: GalleryHorizontalEnd, enabled: true },
-  { id: 'favorites', label: 'Favorites', icon: Heart, enabled: false },
+  { id: 'favorites', label: 'Favorites', icon: Heart, enabled: true },
 ]
 
 interface AppShellProps extends PropsWithChildren {

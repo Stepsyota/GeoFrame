@@ -266,10 +266,19 @@ void Router::register_routes() {
             const auto limit_str = params.count("limit") ? params.at("limit") : std::string{"50"};
             const auto offset_str =
                 params.count("offset") ? params.at("offset") : std::string{"0"};
+            const auto favorite_str =
+                params.count("favorite") ? params.at("favorite") : std::string{};
 
             const core::AssetStatus status =
                 (status_str == "trashed") ? core::AssetStatus::Trashed
                                            : core::AssetStatus::Active;
+
+            std::optional<bool> favorite_filter;
+            if (favorite_str == "1" || favorite_str == "true") {
+                favorite_filter = true;
+            } else if (favorite_str == "0" || favorite_str == "false") {
+                favorite_filter = false;
+            }
 
             std::size_t limit = 50;
             std::size_t offset = 0;
@@ -277,8 +286,8 @@ void Router::register_routes() {
             std::from_chars(offset_str.data(), offset_str.data() + offset_str.size(), offset);
             limit = std::min(limit, std::size_t{200});
 
-            const auto items = assets_.list(limit, offset, status);
-            const auto total = assets_.count(status);
+            const auto items = assets_.list(limit, offset, status, favorite_filter);
+            const auto total = assets_.count(status, favorite_filter);
 
             json body;
             body["items"] = json::array();

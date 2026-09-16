@@ -3,6 +3,7 @@ import { useState } from 'react'
 import type { AppPage } from './components/AppShell'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { DuplicatesPage } from './pages/DuplicatesPage'
+import { FavoritesPage } from './pages/FavoritesPage'
 import { GalleryPage } from './pages/GalleryPage'
 import { MapPage } from './pages/MapPage'
 import { SeriesPage } from './pages/SeriesPage'
@@ -18,6 +19,8 @@ export const App = () => {
         <DuplicatesPage onNavigate={setPage} />
       ) : page === 'series' ? (
         <SeriesPage onNavigate={setPage} />
+      ) : page === 'favorites' ? (
+        <FavoritesPage onNavigate={setPage} />
       ) : (
         <GalleryPage onNavigate={setPage} />
       )}
