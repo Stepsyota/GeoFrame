@@ -12,6 +12,7 @@ namespace geoframe::core {
 struct Config {
     std::filesystem::path source;                                         // source library folder
     std::filesystem::path data_dir;                                       // db + cache + certs
+    std::filesystem::path web_dir;                                        // React build (web/dist)
     std::string host = "0.0.0.0";                                        // bind address
     std::uint16_t port = 8443;                                           // HTTPS port
     int worker_threads = 0;                                               // 0 = hardware_concurrency - 1

@@ -1,5 +1,5 @@
 import { AlertCircle, ImageOff } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { AppShell } from '../components/AppShell'
 import { Lightbox } from '../components/Lightbox'
@@ -51,12 +51,34 @@ const GallerySkeleton = () => (
 )
 
 export const GalleryPage = () => {
-  const { data, loading, error } = useAssets()
+  const { items, total, loading, loadingMore, error, hasMore, loadMore } = useAssets()
   const [selectedId, setSelectedId] = useState<number | null>(null)
+  const loadMoreRef = useRef<HTMLDivElement | null>(null)
 
-  const assets = useMemo(() => data?.items ?? [], [data])
+  const assets = useMemo(() => items, [items])
   const selectedIndex = selectedId === null ? -1 : assets.findIndex((a) => a.id === selectedId)
   const selectedAsset = selectedIndex >= 0 ? assets[selectedIndex] : null
+
+  useEffect(() => {
+    if (!hasMore || loading || loadingMore) {
+      return
+    }
+    const node = loadMoreRef.current
+    if (!node) {
+      return
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          loadMore()
+        }
+      },
+      { rootMargin: '400px' },
+    )
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [hasMore, loadMore, loading, loadingMore])
 
   const openAsset = (asset: AssetSummary) => setSelectedId(asset.id)
   const closeLightbox = () => setSelectedId(null)
@@ -70,7 +92,7 @@ export const GalleryPage = () => {
   }
 
   return (
-    <AppShell total={data?.total}>
+    <AppShell total={total}>
       {loading && <GallerySkeleton />}
 
       {error && (
@@ -87,7 +109,7 @@ export const GalleryPage = () => {
         </section>
       )}
 
-      {!loading && !error && data && (data.items ?? []).length === 0 && (
+      {!loading && !error && assets.length === 0 && (
         <section className="state-card">
           <ImageOff size={30} />
           <div>
@@ -97,20 +119,26 @@ export const GalleryPage = () => {
         </section>
       )}
 
-      {data &&
-        Array.from(groupByDay(data.items)).map(([day, assets]) => (
+      {assets.length > 0 &&
+        Array.from(groupByDay(assets)).map(([day, dayAssets]) => (
           <section className="day-section" key={day}>
             <div className="day-heading">
               <h2>{dayTitle(day)}</h2>
-              <span>{assets.length}</span>
+              <span>{dayAssets.length}</span>
             </div>
             <div className="media-grid">
-              {assets.map((asset) => (
+              {dayAssets.map((asset) => (
                 <MediaCard asset={asset} key={asset.id} onOpen={openAsset} />
               ))}
             </div>
           </section>
         ))}
+
+      {hasMore && !loading && (
+        <div className="load-more-sentinel" ref={loadMoreRef} aria-hidden="true">
+          {loadingMore && <GallerySkeleton />}
+        </div>
+      )}
 
       {selectedAsset && (
         <Lightbox

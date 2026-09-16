@@ -181,6 +181,11 @@ button:focus-visible {
   font-size: 12px;
 }
 
+.load-more-sentinel {
+  min-height: 1px;
+  padding-bottom: 24px;
+}
+
 .media-grid,
 .gallery-skeleton {
   display: grid;

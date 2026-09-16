@@ -38,6 +38,7 @@ struct Args {
     std::string positional;        // scan: source path
     std::string source;
     std::string data_dir;
+    std::string web_dir;
     std::string host;
     std::uint16_t port = 0;
     int threads = 0;
@@ -58,6 +59,7 @@ void print_help() {
         << "Options:\n"
         << "  --source <path>     Source folder with photos/videos\n"
         << "  --data-dir <path>   GeoFrame data dir (default: ~/.local/share/geoframe)\n"
+        << "  --web-dir <path>    React build dir (default: ./web/dist or GEOFRAME_WEB_DIR)\n"
         << "  --host <addr>       Bind address (default: 0.0.0.0)\n"
         << "  --port <n>          HTTPS port (default: 8443)\n"
         << "  --threads <n>       Worker thread count (default: hardware_concurrency-1)\n"
@@ -92,6 +94,7 @@ Args parse_args(const int argc, char* argv[]) {
 
         if (a == "--source")   { args.source   = next(); continue; }
         if (a == "--data-dir") { args.data_dir = next(); continue; }
+        if (a == "--web-dir")  { args.web_dir  = next(); continue; }
         if (a == "--host")     { args.host     = next(); continue; }
         if (a == "--threads")  { args.threads  = std::stoi(std::string{next()}); continue; }
         if (a == "--port") {
@@ -126,6 +129,17 @@ core::Config build_config(const Args& args) {
 
     if (!args.source.empty()) {
         cfg.source = std::filesystem::absolute(std::filesystem::path{args.source}).lexically_normal();
+    }
+
+    if (!args.web_dir.empty()) {
+        cfg.web_dir = std::filesystem::absolute(std::filesystem::path{args.web_dir}).lexically_normal();
+    } else {
+        const char* env_web = std::getenv("GEOFRAME_WEB_DIR");
+        if (env_web != nullptr && env_web[0] != '\0') {
+            cfg.web_dir = std::filesystem::absolute(std::filesystem::path{env_web}).lexically_normal();
+        } else {
+            cfg.web_dir = (std::filesystem::current_path() / "web" / "dist").lexically_normal();
+        }
     }
 
     cfg.host           = args.host.empty() ? "0.0.0.0" : args.host;

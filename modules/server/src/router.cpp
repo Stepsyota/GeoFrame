@@ -89,6 +89,20 @@ std::string exif_to_iso(const std::string& exif) {
     return iso;
 }
 
+bool is_path_under(const std::filesystem::path& child, const std::filesystem::path& parent) {
+    std::error_code ec;
+    const auto rel = std::filesystem::relative(child, parent, ec);
+    if (ec || rel.empty()) {
+        return false;
+    }
+    for (const auto& part : rel) {
+        if (part == "..") {
+            return false;
+        }
+    }
+    return true;
+}
+
 /** Append ?v=<size>:<mtime> so browsers fetch a new file after regeneration. */
 std::string media_url_with_version(const std::int64_t id, const std::string_view kind,
                                    const std::filesystem::path& path) {
@@ -210,19 +224,24 @@ HttpResponse Router::dispatch(const HttpRequest& req) const {
         }
     }
 
-    // Static file fallback (web/dist)
-    const auto dist_dir = config_.data_dir.parent_path() / "web" / "dist";
-    if (req.method == "GET") {
-        auto file = dist_dir / req.path.substr(1);  // strip leading /
-        if (std::filesystem::is_directory(file)) {
+    // Static file fallback (React production build)
+    const auto& dist_dir = config_.web_dir;
+    if (req.method == "GET" && !dist_dir.empty()) {
+        const auto rel = req.path.empty() || req.path == "/" ? "index.html" : req.path.substr(1);
+        auto file = dist_dir / rel;
+        std::error_code ec;
+        if (std::filesystem::is_directory(file, ec)) {
             file /= "index.html";
         }
-        if (std::filesystem::is_regular_file(file)) {
-            return {.status = 200, .content_type = "text/html", .file_path = file};
+        const auto resolved = std::filesystem::weakly_canonical(file, ec);
+        const auto dist_root = std::filesystem::weakly_canonical(dist_dir, ec);
+        if (!ec && is_path_under(resolved, dist_root) &&
+            std::filesystem::is_regular_file(resolved, ec)) {
+            return {.status = 200, .content_type = "text/html", .file_path = resolved};
         }
-        // SPA fallback
-        const auto index = dist_dir / "index.html";
-        if (std::filesystem::is_regular_file(index)) {
+        // SPA fallback — unknown routes serve index.html
+        const auto index = dist_root / "index.html";
+        if (std::filesystem::is_regular_file(index, ec)) {
             return {.status = 200, .content_type = "text/html", .file_path = index};
         }
     }

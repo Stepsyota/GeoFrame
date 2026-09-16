@@ -77,7 +77,7 @@ Python-код не развиваем. Используем как reference п�
 #### Web UI
 
 - [x] React/Vite-каркас галереи (mobile-first, desktop тоже; demo mode)
-- [ ] Подключение галереи к реальному HTTP API
+- [x] Подключение галереи к реальному HTTP API (dev proxy + production static serve)
 - [ ] Просмотр фото: дата, место, камера, полный EXIF, скачать оригинал
 - [ ] Избранное
 - [ ] Удаление → Trash
@@ -186,8 +186,8 @@ GeoFrame читает source folder. Внешние изменения файл�
 6. **Preview generation** — thumbnails и previews через ffmpeg ✅
 7. **Video pipeline** — ffprobe metadata, ffmpeg poster frame, video DB fields ✅
 8. **HTTP API + CLI + TLS** — REST + Boost.Beast + self-signed cert + CLI subcommands ✅
-9. **React gallery** — каркас и demo mode ✅; подключение к реальному API — следующий шаг
-10. **WebSocket progress** — live прогресс индексации (`/ws/events`)
+9. **React gallery** — каркас, demo mode, real API + pagination ✅
+10. **WebSocket progress** — live прогресс индексации (`/ws/events`) — следующий шаг
 11. **Map** — GeoJSON endpoint + MapLibre
 12. **Duplicates + series** — детекция + UI
 13. **Удалить Python-прототип**

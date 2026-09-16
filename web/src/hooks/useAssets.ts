@@ -1,44 +1,88 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { getAssets } from '../api/assets'
-import type { AssetPage } from '../types/asset'
+import type { AssetPage, AssetSummary } from '../types/asset'
+
+const PAGE_SIZE = 50
 
 interface AssetsState {
-  data: AssetPage | null
+  items: AssetSummary[]
+  total: number
   loading: boolean
+  loadingMore: boolean
   error: string | null
+  hasMore: boolean
+  loadMore: () => void
 }
 
 export const useAssets = (): AssetsState => {
-  const [state, setState] = useState<AssetsState>({
-    data: null,
-    loading: true,
-    error: null,
-  })
+  const [items, setItems] = useState<AssetSummary[]>([])
+  const [total, setTotal] = useState(0)
+  const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const offsetRef = useRef(0)
+  const loadingMoreRef = useRef(false)
+
+  const applyPage = useCallback((page: AssetPage, append: boolean) => {
+    if (!page || !Array.isArray(page.items)) {
+      throw new Error('Unexpected API response shape')
+    }
+    setItems((prev) => (append ? [...prev, ...page.items] : page.items))
+    setTotal(page.total)
+    offsetRef.current = append ? offsetRef.current + page.items.length : page.items.length
+  }, [])
 
   useEffect(() => {
     const controller = new AbortController()
+    offsetRef.current = 0
 
-    // Reset to loading on every (re-)mount, including StrictMode's double-invoke
-    setState({ data: null, loading: true, error: null })
-
-    getAssets(50, 0, controller.signal)
+    getAssets(PAGE_SIZE, 0, controller.signal)
       .then((page) => {
-        // Validate that we got a proper page object before setting state
-        if (!page || !Array.isArray(page.items)) {
-          throw new Error('Unexpected API response shape')
-        }
-        setState({ data: page, loading: false, error: null })
+        applyPage(page, false)
+        setLoading(false)
+        setError(null)
       })
-      .catch((error: unknown) => {
+      .catch((err: unknown) => {
         if (!controller.signal.aborted) {
-          const message = error instanceof Error ? error.message : 'Unknown API error'
-          setState({ data: null, loading: false, error: message })
+          const message = err instanceof Error ? err.message : 'Unknown API error'
+          setError(message)
+          setLoading(false)
         }
       })
 
     return () => controller.abort()
-  }, [])
+  }, [applyPage])
 
-  return state
+  const loadMore = useCallback(() => {
+    if (loadingMoreRef.current || loading || items.length >= total) {
+      return
+    }
+
+    loadingMoreRef.current = true
+    setLoadingMore(true)
+
+    getAssets(PAGE_SIZE, offsetRef.current)
+      .then((page) => {
+        applyPage(page, true)
+      })
+      .catch((err: unknown) => {
+        const message = err instanceof Error ? err.message : 'Unknown API error'
+        setError(message)
+      })
+      .finally(() => {
+        loadingMoreRef.current = false
+        setLoadingMore(false)
+      })
+  }, [applyPage, items.length, loading, total])
+
+  return {
+    items,
+    total,
+    loading,
+    loadingMore,
+    error,
+    hasMore: items.length < total,
+    loadMore,
+  }
 }
