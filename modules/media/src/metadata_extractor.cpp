@@ -103,6 +103,32 @@ std::optional<int> dimension(const std::uint32_t value) {
 
 }  // namespace
 
+std::vector<ExifTag> extract_image_exif(const std::filesystem::path& path) {
+    try {
+        auto image = Exiv2::ImageFactory::open(path.string());
+        if (!image) {
+            throw std::runtime_error("Exiv2 cannot open image: " + path.string());
+        }
+        image->readMetadata();
+
+        std::vector<ExifTag> tags;
+        for (const auto& tag : image->exifData()) {
+            const auto value = tag.toString();
+            if (value.empty()) {
+                continue;
+            }
+            tags.push_back(ExifTag{.key = tag.key(), .value = value});
+        }
+
+        std::ranges::sort(tags, [](const ExifTag& left, const ExifTag& right) {
+            return left.key < right.key;
+        });
+        return tags;
+    } catch (const Exiv2::Error& error) {
+        throw std::runtime_error("Cannot extract EXIF from " + path.string() + ": " + error.what());
+    }
+}
+
 core::AssetMetadata extract_image_metadata(const std::filesystem::path& path) {
     try {
         auto image = Exiv2::ImageFactory::open(path.string());

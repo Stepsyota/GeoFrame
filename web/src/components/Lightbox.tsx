@@ -8,7 +8,9 @@ import {
   setAssetFavorite,
   trashAsset,
 } from '../api/assets'
+import { getAssetExif } from '../api/exif'
 import type { AssetDetail, AssetSummary } from '../types/asset'
+import type { ExifTag } from '../types/exif'
 
 interface LightboxProps {
   asset: AssetSummary
@@ -67,6 +69,8 @@ export const Lightbox = ({
   onDeletePermanent,
 }: LightboxProps) => {
   const [detail, setDetail] = useState<AssetDetail | null>(null)
+  const [exifTags, setExifTags] = useState<ExifTag[]>([])
+  const [exifError, setExifError] = useState<string | null>(null)
   const [pendingFavorite, setPendingFavorite] = useState<boolean | null>(null)
   const [busy, setBusy] = useState(false)
   const favorite = pendingFavorite ?? asset.favorite
@@ -80,6 +84,30 @@ export const Lightbox = ({
 
     return () => controller.abort()
   }, [asset.id])
+
+  useEffect(() => {
+    if (asset.mediaType !== 'image') {
+      return
+    }
+
+    const controller = new AbortController()
+
+    void getAssetExif(asset.id, controller.signal)
+      .then((payload) => {
+        setExifTags(payload.tags)
+        setExifError(null)
+      })
+      .catch((err: unknown) => {
+        if (err instanceof DOMException && err.name === 'AbortError') {
+          return
+        }
+        const message = err instanceof Error ? err.message : 'Could not load EXIF'
+        setExifTags([])
+        setExifError(message)
+      })
+
+    return () => controller.abort()
+  }, [asset.id, asset.mediaType])
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -287,6 +315,26 @@ export const Lightbox = ({
               </div>
             )}
           </dl>
+
+          {asset.mediaType === 'image' && (
+            <section className="lightbox-exif">
+              <h3>EXIF</h3>
+              {exifError && <p className="lightbox-exif-error">{exifError}</p>}
+              {!exifError && exifTags.length === 0 && (
+                <p className="lightbox-exif-empty">No EXIF tags found.</p>
+              )}
+              {exifTags.length > 0 && (
+                <dl className="lightbox-exif-list">
+                  {exifTags.map((tag) => (
+                    <div key={tag.key}>
+                      <dt>{tag.key}</dt>
+                      <dd>{tag.value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              )}
+            </section>
+          )}
         </aside>
       </div>
     </div>

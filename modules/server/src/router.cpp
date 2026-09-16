@@ -3,6 +3,7 @@
 #include "core/duplicate_grouper.hpp"
 #include "core/map_clusterer.hpp"
 #include "core/series_detector.hpp"
+#include "media/metadata_extractor.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -375,6 +376,38 @@ void Router::register_routes() {
                 return not_found("Preview not yet generated");
             }
             return {.status = 200, .content_type = "image/jpeg", .file_path = *path};
+        },
+    });
+
+    // ── GET /api/assets/{id}/exif ─────────────────────────────────────────
+    routes_.push_back({
+        "GET",
+        {"api", "assets", "{id}", "exif"},
+        [this](const HttpRequest&, const std::vector<std::string>& caps) -> HttpResponse {
+            const auto id = require_id(caps[0]);
+            const auto asset = assets_.find_by_id(id);
+            if (!asset.has_value()) {
+                return not_found("Asset not found");
+            }
+
+            json body;
+            body["tags"] = json::array();
+            if (asset->media_type != core::MediaType::Image) {
+                body["mediaType"] = "video";
+                return json_ok(body);
+            }
+
+            try {
+                const auto tags = media::extract_image_exif(asset->source_path);
+                for (const auto& tag : tags) {
+                    body["tags"].push_back({{"key", tag.key}, {"value", tag.value}});
+                }
+            } catch (const std::exception& error) {
+                return json_error(500, error.what());
+            }
+
+            body["mediaType"] = "image";
+            return json_ok(body);
         },
     });
 

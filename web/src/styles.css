@@ -624,6 +624,62 @@ button:focus-visible {
   font-size: 12px;
 }
 
+.lightbox-exif {
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid #2d332b;
+}
+
+.lightbox-exif h3 {
+  margin: 0 0 0.75rem;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #9aa193;
+}
+
+.lightbox-exif-empty,
+.lightbox-exif-error {
+  margin: 0;
+  color: #8e9789;
+  font-size: 0.85rem;
+}
+
+.lightbox-exif-error {
+  color: #efb4b4;
+}
+
+.lightbox-exif-list {
+  display: grid;
+  gap: 10px;
+  max-height: 38vh;
+  margin: 0;
+  overflow: auto;
+  padding-right: 0.25rem;
+}
+
+.lightbox-exif-list div {
+  display: grid;
+  gap: 2px;
+}
+
+.lightbox-exif-list dt {
+  color: #7f877b;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.lightbox-exif-list dd {
+  margin: 0;
+  color: #dde3d8;
+  font-size: 12px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
 .lightbox-media {
   max-width: 100%;
   max-height: 100%;

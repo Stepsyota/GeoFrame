@@ -65,6 +65,7 @@ target_link_libraries(
         nlohmann_json::nlohmann_json
         spdlog::spdlog
     PRIVATE
+        GeoFrame::media
         Boost::beast
         Boost::asio
         Boost::system

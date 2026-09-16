@@ -3,6 +3,7 @@
 #include <exiv2/exiv2.hpp>
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <chrono>
 #include <filesystem>
 #include <string>
@@ -55,6 +56,22 @@ TEST_F(MetadataExtractorTest, ExtractsNormalizedExif) {
 
 TEST_F(MetadataExtractorTest, RejectsMissingFile) {
     EXPECT_THROW(extract_image_metadata(path), std::runtime_error);
+}
+
+TEST_F(MetadataExtractorTest, ExtractsFullExifTagList) {
+    create_image_with_exif();
+
+    const auto tags = extract_image_exif(path);
+    EXPECT_GE(tags.size(), 5U);
+    EXPECT_TRUE(std::ranges::is_sorted(tags, {}, &ExifTag::key));
+
+    const auto find_tag = [&](const std::string& key) {
+        return std::ranges::find_if(tags, [&](const ExifTag& tag) { return tag.key == key; });
+    };
+
+    const auto make = find_tag("Exif.Image.Make");
+    ASSERT_NE(make, tags.end());
+    EXPECT_EQ(make->value, "Apple");
 }
 
 }  // namespace geoframe::media
