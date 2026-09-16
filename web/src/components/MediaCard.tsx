@@ -21,12 +21,17 @@ export const MediaCard = ({ asset, onOpen }: MediaCardProps) => (
     )}
 
     <span className="media-card-shade" />
-    {asset.mediaType === 'video' && (
+    {asset.livePhoto ? (
+      <span className="media-badge live-photo-badge">
+        <Play size={13} fill="currentColor" />
+        LIVE
+      </span>
+    ) : asset.mediaType === 'video' ? (
       <span className="media-badge">
         <Play size={13} fill="currentColor" />
         Video
       </span>
-    )}
+    ) : null}
     {asset.favorite && (
       <span className="favorite-badge" aria-label="Favorite">
         <Heart size={16} fill="currentColor" />

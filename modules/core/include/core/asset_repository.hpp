@@ -3,6 +3,7 @@
 #include "core/asset.hpp"
 #include "core/duplicate_grouper.hpp"
 #include "core/geo_asset.hpp"
+#include "core/live_photo_pairer.hpp"
 #include "core/series_detector.hpp"
 
 #include <cstddef>
@@ -12,6 +13,12 @@
 #include <vector>
 
 namespace geoframe::core {
+
+struct LivePhotoLink {
+    std::int64_t id;
+    std::int64_t image_asset_id;
+    std::int64_t video_asset_id;
+};
 
 /**
  * @brief Хранилище проиндексированных медиафайлов.
@@ -41,6 +48,13 @@ public:
         AssetStatus status = AssetStatus::Active) = 0;
     virtual std::vector<TimedAsset> list_timed_assets(
         AssetStatus status = AssetStatus::Active) = 0;
+    virtual std::vector<PairingCandidate> list_pairing_candidates(
+        AssetStatus status = AssetStatus::Active) = 0;
+    virtual std::vector<LivePhotoLink> list_live_photo_pairs() = 0;
+    virtual std::optional<std::int64_t> live_photo_video_for_image(std::int64_t image_id) = 0;
+    virtual std::optional<std::int64_t> live_photo_image_for_video(std::int64_t video_id) = 0;
+    virtual void link_live_photo(std::int64_t image_asset_id, std::int64_t video_asset_id) = 0;
+    virtual void unlink_live_photo(std::int64_t image_asset_id) = 0;
     virtual void erase(std::int64_t id) = 0;
 };
 

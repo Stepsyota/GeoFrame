@@ -6,6 +6,8 @@ add_library(
         src/map_clusterer.cpp
         src/duplicate_grouper.cpp
         src/series_detector.cpp
+        src/live_photo_pairer.cpp
+        src/live_photo_sync.cpp
         src/progress_tracker.cpp
 )
 add_library(GeoFrame::core ALIAS geoframe_core)

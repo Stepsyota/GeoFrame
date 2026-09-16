@@ -86,4 +86,16 @@ TEST_F(ScanServiceTest, DoesNotIndexKnownFileTwice) {
     EXPECT_EQ(assets.list(10, 0).size(), 1);
 }
 
+TEST_F(ScanServiceTest, PairsHeicLivePhotosAfterScan) {
+    create_file("IMG_0001.HEIC");
+    create_file("IMG_0001.MOV");
+
+    service.scan(source);
+
+    EXPECT_EQ(assets.list(10, 0).size(), 1);
+    const auto pairs = assets.list_live_photo_pairs();
+    ASSERT_EQ(pairs.size(), 1);
+    EXPECT_EQ(pairs[0].image_asset_id, assets.list(10, 0)[0].id);
+}
+
 }  // namespace geoframe::worker

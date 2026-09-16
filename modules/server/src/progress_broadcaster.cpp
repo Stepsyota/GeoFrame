@@ -60,8 +60,11 @@ std::string ProgressBroadcaster::snapshot_json() const {
     body["thumbnailsPercent"] = stats.thumbnail.percent_done();
     body["previewsPercent"] = stats.preview.percent_done();
     body["hashPercent"] = stats.hash.percent_done();
-    body["pendingJobs"] = stats.hash.pending + stats.metadata.pending + stats.video_metadata.pending
-                        + stats.thumbnail.pending + stats.preview.pending;
+    body["pendingJobs"] = stats.hash.pending + stats.hash.processing + stats.metadata.pending
+                        + stats.metadata.processing + stats.video_metadata.pending
+                        + stats.video_metadata.processing + stats.thumbnail.pending
+                        + stats.thumbnail.processing + stats.preview.pending
+                        + stats.preview.processing;
     if (progress.current_file.empty()) {
         body["currentFile"] = nullptr;
     } else {

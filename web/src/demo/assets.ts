@@ -23,6 +23,7 @@ const item = (
   capturedAt: string,
   colors: [string, string],
   favorite = false,
+  livePhoto = false,
 ): AssetSummary => ({
   id,
   originalFilename: name,
@@ -34,10 +35,11 @@ const item = (
   favorite,
   thumbnailUrl: thumbnail(name.replace(/\..+$/, ''), ...colors),
   previewUrl: thumbnail(name.replace(/\..+$/, ''), ...colors),
+  livePhoto: livePhoto ? { videoId: id + 10_000 } : undefined,
 })
 
 const items = [
-  item(1, 'IMG_4821.HEIC', '2026-09-13T18:42:00', ['#d38754', '#51483c'], true),
+  item(1, 'IMG_4821.HEIC', '2026-09-13T18:42:00', ['#d38754', '#51483c'], true, true),
   item(2, 'IMG_4822.HEIC', '2026-09-13T18:43:12', ['#91a889', '#31483d']),
   item(3, 'IMG_4823.HEIC', '2026-09-13T18:43:14', ['#7897ab', '#283640']),
   item(4, 'IMG_4818.HEIC', '2026-09-13T16:20:00', ['#c3a879', '#5a452e']),

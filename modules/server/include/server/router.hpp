@@ -3,7 +3,9 @@
 #include "core/asset_repository.hpp"
 #include "core/config.hpp"
 #include "core/job_repository.hpp"
+#include "core/progress_tracker.hpp"
 
+#include <atomic>
 #include <filesystem>
 #include <functional>
 #include <string>
@@ -39,7 +41,8 @@ public:
 
     Router(core::IAssetRepository& assets,
            core::IJobRepository& jobs,
-           const core::Config& config);
+           const core::Config& config,
+           core::ProgressTracker& progress);
 
     HttpResponse dispatch(const HttpRequest& req) const;
 
@@ -59,6 +62,8 @@ private:
     core::IAssetRepository& assets_;
     core::IJobRepository& jobs_;
     const core::Config& config_;
+    core::ProgressTracker& progress_;
+    std::atomic<bool> scan_running_{false};
 };
 
 }  // namespace geoframe::server

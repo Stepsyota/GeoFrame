@@ -4,8 +4,11 @@
 #include "core/map_clusterer.hpp"
 #include "core/series_detector.hpp"
 #include "media/metadata_extractor.hpp"
+#include "storage/directory_scanner.hpp"
+#include "worker/scan_service.hpp"
 
 #include <nlohmann/json.hpp>
+#include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <charconv>
@@ -15,6 +18,7 @@
 #include <stdexcept>
 #include <string>
 #include <system_error>
+#include <thread>
 
 namespace geoframe::server {
 
@@ -123,7 +127,8 @@ std::string media_url_with_version(const std::int64_t id, const std::string_view
     return url;
 }
 
-json asset_to_json(const core::Asset& a) {
+json asset_to_json(const core::Asset& a,
+                   const std::optional<std::int64_t> live_video_id = std::nullopt) {
     json obj;
     obj["id"] = a.id;
     obj["originalFilename"] = a.original_filename;
@@ -176,7 +181,19 @@ json asset_to_json(const core::Asset& a) {
     } else {
         obj["previewUrl"] = nullptr;
     }
+    if (live_video_id.has_value()) {
+        obj["livePhoto"] = json{{"videoId", *live_video_id}};
+    }
     return obj;
+}
+
+std::unordered_map<std::int64_t, std::int64_t> live_photo_video_map(
+    core::IAssetRepository& assets) {
+    std::unordered_map<std::int64_t, std::int64_t> map;
+    for (const auto& link : assets.list_live_photo_pairs()) {
+        map.emplace(link.image_asset_id, link.video_asset_id);
+    }
+    return map;
 }
 
 void remove_file_quietly(const std::filesystem::path& path) {
@@ -197,6 +214,42 @@ void remove_asset_files(const core::Asset& asset) {
     }
 }
 
+void trash_asset_with_companion(core::IAssetRepository& assets, const std::int64_t id) {
+    if (const auto video_id = assets.live_photo_video_for_image(id); video_id.has_value()) {
+        assets.set_status(*video_id, core::AssetStatus::Trashed);
+    } else if (const auto image_id = assets.live_photo_image_for_video(id); image_id.has_value()) {
+        assets.set_status(*image_id, core::AssetStatus::Trashed);
+    }
+    assets.set_status(id, core::AssetStatus::Trashed);
+}
+
+void restore_asset_with_companion(core::IAssetRepository& assets, const std::int64_t id) {
+    if (const auto video_id = assets.live_photo_video_for_image(id); video_id.has_value()) {
+        assets.set_status(*video_id, core::AssetStatus::Active);
+    } else if (const auto image_id = assets.live_photo_image_for_video(id); image_id.has_value()) {
+        assets.set_status(*image_id, core::AssetStatus::Active);
+    }
+    assets.set_status(id, core::AssetStatus::Active);
+}
+
+void erase_asset_with_companion(core::IAssetRepository& assets, const core::Asset& asset) {
+    std::optional<std::int64_t> companion_id = assets.live_photo_video_for_image(asset.id);
+    if (!companion_id.has_value()) {
+        companion_id = assets.live_photo_image_for_video(asset.id);
+    }
+
+    if (companion_id.has_value()) {
+        const auto companion = assets.find_by_id(*companion_id);
+        if (companion.has_value()) {
+            remove_asset_files(*companion);
+            assets.erase(*companion_id);
+        }
+    }
+
+    remove_asset_files(asset);
+    assets.erase(asset.id);
+}
+
 bool confirms_action(const HttpRequest& req, const std::string& expected) {
     if (req.body.empty()) {
         return false;
@@ -212,8 +265,9 @@ bool confirms_action(const HttpRequest& req, const std::string& expected) {
 
 Router::Router(core::IAssetRepository& assets,
                core::IJobRepository& jobs,
-               const core::Config& config)
-    : assets_(assets), jobs_(jobs), config_(config) {
+               const core::Config& config,
+               core::ProgressTracker& progress)
+    : assets_(assets), jobs_(jobs), config_(config), progress_(progress) {
     register_routes();
 }
 
@@ -316,11 +370,16 @@ void Router::register_routes() {
 
             const auto items = assets_.list(limit, offset, status, favorite_filter);
             const auto total = assets_.count(status, favorite_filter);
+            const auto live_photos = live_photo_video_map(assets_);
 
             json body;
             body["items"] = json::array();
             for (const auto& asset : items) {
-                body["items"].push_back(asset_to_json(asset));
+                const auto it = live_photos.find(asset.id);
+                const auto live_video_id =
+                    it != live_photos.end() ? std::optional<std::int64_t>{it->second}
+                                            : std::nullopt;
+                body["items"].push_back(asset_to_json(asset, live_video_id));
             }
             body["total"] = total;
             body["limit"] = limit;
@@ -339,7 +398,8 @@ void Router::register_routes() {
             if (!asset.has_value()) {
                 return not_found("Asset not found");
             }
-            return json_ok(asset_to_json(*asset));
+            const auto live_video_id = assets_.live_photo_video_for_image(id);
+            return json_ok(asset_to_json(*asset, live_video_id));
         },
     });
 
@@ -460,7 +520,7 @@ void Router::register_routes() {
             if (!asset.has_value()) {
                 return not_found("Asset not found");
             }
-            assets_.set_status(id, core::AssetStatus::Trashed);
+            trash_asset_with_companion(assets_, id);
             return json_ok({{"id", id}, {"status", "trashed"}});
         },
     });
@@ -475,7 +535,7 @@ void Router::register_routes() {
             if (!asset.has_value()) {
                 return not_found("Asset not found");
             }
-            assets_.set_status(id, core::AssetStatus::Active);
+            restore_asset_with_companion(assets_, id);
             return json_ok({{"id", id}, {"status", "active"}});
         },
     });
@@ -498,8 +558,7 @@ void Router::register_routes() {
                 return json_error(400, "Only trashed assets can be permanently deleted");
             }
 
-            remove_asset_files(*asset);
-            assets_.erase(id);
+            erase_asset_with_companion(assets_, *asset);
             return json_ok({{"id", id}, {"deleted", true}});
         },
     });
@@ -521,8 +580,7 @@ void Router::register_routes() {
                     break;
                 }
                 for (const auto& asset : batch) {
-                    remove_asset_files(asset);
-                    assets_.erase(asset.id);
+                    erase_asset_with_companion(assets_, asset);
                     ++deleted;
                 }
             }
@@ -696,9 +754,18 @@ void Router::register_routes() {
             std::error_code ec;
             const auto space = std::filesystem::space(config_.data_dir, ec);
 
+            const auto progress = progress_.snapshot();
+
             json body;
             body["assets"]["active"] = active;
             body["assets"]["trashed"] = trashed;
+            body["scanning"] = progress.scanning;
+            if (config_.source.empty()) {
+                body["source"] = nullptr;
+            } else {
+                body["source"] = config_.source.string();
+            }
+            body["dataDir"] = config_.data_dir.string();
             if (!ec) {
                 body["disk"]["availableMB"] =
                     static_cast<std::int64_t>(space.available / (1024 * 1024));
@@ -725,13 +792,38 @@ void Router::register_routes() {
             if (source.empty()) {
                 return json_error(400, "No source path configured");
             }
-            // Scan is enqueued; the WorkerPool picks up the jobs.
-            // For now return accepted and let the worker pool handle it.
-            // Full scan trigger will be implemented when we wire the scan service.
+
+            std::error_code ec;
+            if (!std::filesystem::is_directory(source, ec)) {
+                return json_error(400, "Source path is not a directory");
+            }
+
+            if (progress_.snapshot().scanning) {
+                return json_error(409, "Scan already in progress");
+            }
+            if (scan_running_.exchange(true)) {
+                return json_error(409, "Scan already in progress");
+            }
+
+            const auto scan_path = std::filesystem::absolute(source).lexically_normal();
+            std::thread([this, scan_path]() {
+                try {
+                    storage::DirectoryScanner scanner;
+                    worker::ScanService scan_svc{scanner, assets_, jobs_, &progress_};
+                    const auto report = scan_svc.scan(scan_path);
+                    spdlog::info("API scan finished: {} new, {} existing, {} unsupported, {} errors",
+                                 report.assets_created, report.already_indexed,
+                                 report.unsupported, report.filesystem_errors);
+                } catch (const std::exception& ex) {
+                    spdlog::error("API scan failed: {}", ex.what());
+                }
+                scan_running_ = false;
+            }).detach();
+
             return {.status = 202,
                     .content_type = "application/json",
                     .body = json{{"status", "accepted"},
-                                 {"source", source.string()}}.dump()};
+                                 {"source", scan_path.string()}}.dump()};
         },
     });
 }

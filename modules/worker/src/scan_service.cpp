@@ -2,6 +2,7 @@
 
 #include "core/asset.hpp"
 #include "core/job.hpp"
+#include "core/live_photo_sync.hpp"
 #include "storage/media_file.hpp"
 
 #include <optional>
@@ -74,6 +75,9 @@ ScanReport ScanService::scan(const std::filesystem::path& root) {
 
     report.files_seen = summary.files;
     report.filesystem_errors += summary.filesystem_errors;
+
+    sync_live_photo_pairs(assets);
+
     return report;
 }
 

@@ -1,5 +1,6 @@
 #include "worker/video_job_handler.hpp"
 
+#include "core/live_photo_sync.hpp"
 #include "media/video_extractor.hpp"
 
 #include <stdexcept>
@@ -45,6 +46,7 @@ void VideoJobHandler::execute(const core::Job& job) {
     if (type == core::JobType::VideoMetadata) {
         const auto metadata = media::extract_video_metadata(asset->source_path);
         assets.set_video_metadata(asset->id, metadata);
+        sync_live_photo_pairs(assets);
         return;
     }
 

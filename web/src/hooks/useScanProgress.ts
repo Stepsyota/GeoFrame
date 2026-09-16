@@ -4,11 +4,10 @@ import type { ScanProgressEvent } from '../types/progress'
 
 const demoMode = import.meta.env.VITE_DEMO_MODE === 'true'
 
+/** True while the filesystem walk or in-flight worker jobs are running. */
 const isActive = (event: ScanProgressEvent | null): boolean => {
   if (!event) return false
-  return event.scanning || event.pendingJobs > 0 || event.hashPercent < 100
-    || event.metadataPercent < 100 || event.thumbnailsPercent < 100
-    || event.previewsPercent < 100
+  return event.scanning || event.pendingJobs > 0
 }
 
 export const useScanProgress = () => {

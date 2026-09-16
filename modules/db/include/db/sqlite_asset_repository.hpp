@@ -34,6 +34,13 @@ public:
         core::AssetStatus status = core::AssetStatus::Active) override;
     std::vector<core::TimedAsset> list_timed_assets(
         core::AssetStatus status = core::AssetStatus::Active) override;
+    std::vector<core::PairingCandidate> list_pairing_candidates(
+        core::AssetStatus status = core::AssetStatus::Active) override;
+    std::vector<core::LivePhotoLink> list_live_photo_pairs() override;
+    std::optional<std::int64_t> live_photo_video_for_image(std::int64_t image_id) override;
+    std::optional<std::int64_t> live_photo_image_for_video(std::int64_t video_id) override;
+    void link_live_photo(std::int64_t image_asset_id, std::int64_t video_asset_id) override;
+    void unlink_live_photo(std::int64_t image_asset_id) override;
     void erase(std::int64_t id) override;
 
 private:

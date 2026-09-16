@@ -7,6 +7,7 @@ import { FavoritesPage } from './pages/FavoritesPage'
 import { GalleryPage } from './pages/GalleryPage'
 import { MapPage } from './pages/MapPage'
 import { SeriesPage } from './pages/SeriesPage'
+import { SettingsPage } from './pages/SettingsPage'
 import { TrashPage } from './pages/TrashPage'
 
 export const App = () => {
@@ -24,6 +25,8 @@ export const App = () => {
         <FavoritesPage onNavigate={setPage} />
       ) : page === 'trash' ? (
         <TrashPage onNavigate={setPage} />
+      ) : page === 'settings' ? (
+        <SettingsPage onNavigate={setPage} />
       ) : (
         <GalleryPage onNavigate={setPage} />
       )}

@@ -18,6 +18,7 @@ add_executable(
     core/map_clusterer_test.cpp
     core/duplicate_grouper_test.cpp
     core/series_detector_test.cpp
+    core/live_photo_pairer_test.cpp
 )
 target_link_libraries(geoframe_core_tests PRIVATE GeoFrame::core GTest::gtest_main)
 geoframe_set_warnings(geoframe_core_tests)

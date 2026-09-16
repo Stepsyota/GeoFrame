@@ -1,5 +1,5 @@
 import { ChevronLeft, ChevronRight, Download, Heart, RotateCcw, Trash2, X } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import {
   deleteAssetPermanently,
@@ -38,6 +38,61 @@ const formatBytes = (bytes: number) => {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
+interface LivePhotoStageProps {
+  src: string
+  alt: string
+  liveVideoId: number
+}
+
+const LivePhotoStage = ({ src, alt, liveVideoId }: LivePhotoStageProps) => {
+  const [playingLive, setPlayingLive] = useState(false)
+  const liveVideoRef = useRef<HTMLVideoElement | null>(null)
+
+  const startLivePhoto = () => {
+    if (!liveVideoRef.current) {
+      return
+    }
+    setPlayingLive(true)
+    void liveVideoRef.current.play().catch(() => setPlayingLive(false))
+  }
+
+  const stopLivePhoto = () => {
+    if (!liveVideoRef.current) {
+      return
+    }
+    liveVideoRef.current.pause()
+    liveVideoRef.current.currentTime = 0
+    setPlayingLive(false)
+  }
+
+  return (
+    <div
+      className="lightbox-live-stage"
+      onPointerDown={startLivePhoto}
+      onPointerUp={stopLivePhoto}
+      onPointerLeave={stopLivePhoto}
+      onPointerCancel={stopLivePhoto}
+    >
+      <img
+        className={`lightbox-media ${playingLive ? 'lightbox-live-hidden' : ''}`}
+        src={src}
+        alt={alt}
+      />
+      <video
+        ref={liveVideoRef}
+        className={`lightbox-media lightbox-live-video ${playingLive ? 'is-playing' : ''}`}
+        playsInline
+        muted
+        loop
+        src={`/api/assets/${liveVideoId}/original`}
+      />
+      {!playingLive && (
+        <span className="lightbox-live-hint">Press and hold to play Live Photo</span>
+      )}
+    </div>
+  )
+}
+
 const formatCapturedAt = (value: string | null) => {
   if (!value) {
     return 'Unknown'
@@ -74,6 +129,7 @@ export const Lightbox = ({
   const [pendingFavorite, setPendingFavorite] = useState<boolean | null>(null)
   const [busy, setBusy] = useState(false)
   const favorite = pendingFavorite ?? asset.favorite
+  const liveVideoId = asset.livePhoto?.videoId ?? detail?.livePhoto?.videoId
 
   useEffect(() => {
     const controller = new AbortController()
@@ -261,6 +317,13 @@ export const Lightbox = ({
               poster={asset.thumbnailUrl ?? undefined}
               src={`/api/assets/${asset.id}/original`}
             />
+          ) : src && liveVideoId ? (
+            <LivePhotoStage
+              key={asset.id}
+              src={src}
+              alt={asset.originalFilename}
+              liveVideoId={liveVideoId}
+            />
           ) : src ? (
             <img className="lightbox-media" src={src} alt={asset.originalFilename} />
           ) : (
@@ -312,6 +375,12 @@ export const Lightbox = ({
               <div>
                 <dt>SHA-256</dt>
                 <dd className="lightbox-hash">{detail.sha256.slice(0, 16)}…</dd>
+              </div>
+            )}
+            {liveVideoId && (
+              <div>
+                <dt>Live Photo</dt>
+                <dd>Motion clip attached</dd>
               </div>
             )}
           </dl>

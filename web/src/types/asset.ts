@@ -7,6 +7,10 @@ export interface AssetGps {
   alt: number | null
 }
 
+export interface LivePhotoInfo {
+  videoId: number
+}
+
 export interface AssetSummary {
   id: number
   originalFilename: string
@@ -18,6 +22,7 @@ export interface AssetSummary {
   favorite: boolean
   thumbnailUrl: string | null
   previewUrl: string | null
+  livePhoto?: LivePhotoInfo
 }
 
 export interface AssetDetail extends AssetSummary {

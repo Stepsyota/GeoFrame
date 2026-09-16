@@ -2,6 +2,7 @@
 
 #include "core/config.hpp"
 #include "core/event_bus.hpp"
+#include "core/live_photo_sync.hpp"
 #include "core/progress_tracker.hpp"
 #include "core/version.hpp"
 #include "db/database.hpp"
@@ -324,6 +325,8 @@ int cmd_serve(const Args& args) {
     if (stale_previews > 0) {
         spdlog::info("Re-queued {} stale preview jobs (thumbnail newer than preview)", stale_previews);
     }
+
+    sync_live_photo_pairs(asset_repo);
 
     std::thread scan_thread;
     if (!config.source.empty() && std::filesystem::is_directory(config.source)) {

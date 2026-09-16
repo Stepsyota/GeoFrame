@@ -272,7 +272,7 @@ struct HttpServer::Impl {
           jobs(j),
           events(e),
           progress(p),
-          router(a, j, cfg),
+          router(a, j, cfg, p),
           broadcaster(e, p, a, j) {}
 };
 

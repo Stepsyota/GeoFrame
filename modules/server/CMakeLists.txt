@@ -66,6 +66,7 @@ target_link_libraries(
         spdlog::spdlog
     PRIVATE
         GeoFrame::media
+        GeoFrame::worker
         Boost::beast
         Boost::asio
         Boost::system

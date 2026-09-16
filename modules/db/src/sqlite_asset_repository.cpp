@@ -15,6 +15,9 @@ constexpr std::string_view kAssetColumns =
     "captured_at, width, height, gps_lat, gps_lon, altitude, camera, favorite, "
     "thumbnail_path, preview_path, duration_seconds, video_codec";
 
+constexpr std::string_view kExcludeLivePhotoVideos =
+    "id NOT IN (SELECT video_asset_id FROM live_photos)";
+
 std::string_view to_string(const core::MediaType type) {
     switch (type) {
         case core::MediaType::Image:
@@ -221,6 +224,7 @@ std::vector<core::Asset> SqliteAssetRepository::list(const std::size_t limit,
     if (favorite.has_value()) {
         conditions.push_back("favorite = ?");
     }
+    conditions.push_back(std::string{kExcludeLivePhotoVideos});
     if (!conditions.empty()) {
         sql += " WHERE ";
         for (std::size_t i = 0; i < conditions.size(); ++i) {
@@ -347,7 +351,8 @@ void SqliteAssetRepository::set_status(const std::int64_t id, const core::AssetS
 std::vector<core::HashedAsset> SqliteAssetRepository::list_hashed_assets(
     const core::AssetStatus status) {
     auto statement = database.prepare(
-        "SELECT id, sha256 FROM assets WHERE status = ? AND sha256 IS NOT NULL ORDER BY id");
+        "SELECT id, sha256 FROM assets WHERE status = ? AND sha256 IS NOT NULL AND "
+        + std::string{kExcludeLivePhotoVideos} + " ORDER BY id");
     statement.bind(1, to_string(status));
 
     std::vector<core::HashedAsset> assets;
@@ -363,8 +368,8 @@ std::vector<core::HashedAsset> SqliteAssetRepository::list_hashed_assets(
 std::vector<core::TimedAsset> SqliteAssetRepository::list_timed_assets(
     const core::AssetStatus status) {
     auto statement = database.prepare(
-        "SELECT id, captured_at FROM assets WHERE status = ? AND captured_at IS NOT NULL "
-        "ORDER BY captured_at, id");
+        "SELECT id, captured_at FROM assets WHERE status = ? AND captured_at IS NOT NULL AND "
+        + std::string{kExcludeLivePhotoVideos} + " ORDER BY captured_at, id");
     statement.bind(1, to_string(status));
 
     std::vector<core::TimedAsset> assets;
@@ -381,8 +386,8 @@ std::vector<core::GeoAsset> SqliteAssetRepository::list_geo_points(
     const core::AssetStatus status) {
     auto statement = database.prepare(
         "SELECT id, gps_lat, gps_lon, media_type, favorite FROM assets "
-        "WHERE status = ? AND gps_lat IS NOT NULL AND gps_lon IS NOT NULL "
-        "ORDER BY id");
+        "WHERE status = ? AND gps_lat IS NOT NULL AND gps_lon IS NOT NULL AND "
+        + std::string{kExcludeLivePhotoVideos} + " ORDER BY id");
 
     statement.bind(1, to_string(status));
 
@@ -401,7 +406,8 @@ std::vector<core::GeoAsset> SqliteAssetRepository::list_geo_points(
 
 std::int64_t SqliteAssetRepository::count(const core::AssetStatus status,
                                          const std::optional<bool> favorite) {
-    std::string sql = "SELECT COUNT(*) FROM assets WHERE status = ?";
+    std::string sql = "SELECT COUNT(*) FROM assets WHERE status = ? AND "
+                    + std::string{kExcludeLivePhotoVideos};
     if (favorite.has_value()) {
         sql += " AND favorite = ?";
     }
@@ -417,7 +423,90 @@ std::int64_t SqliteAssetRepository::count(const core::AssetStatus status,
     return statement.column_int64(0);
 }
 
+std::vector<core::PairingCandidate> SqliteAssetRepository::list_pairing_candidates(
+    const core::AssetStatus status) {
+    auto statement = database.prepare(
+        "SELECT id, source_path, media_type, duration_seconds FROM assets WHERE status = ? "
+        "ORDER BY id");
+    statement.bind(1, to_string(status));
+
+    std::vector<core::PairingCandidate> candidates;
+    while (statement.step()) {
+        std::optional<double> duration;
+        if (!statement.column_is_null(3)) {
+            duration = statement.column_double(3);
+        }
+        candidates.push_back(core::PairingCandidate{
+            .id = statement.column_int64(0),
+            .source_path = statement.column_text(1),
+            .media_type = media_type_from_string(statement.column_text(2)),
+            .duration_seconds = duration,
+        });
+    }
+    return candidates;
+}
+
+std::vector<core::LivePhotoLink> SqliteAssetRepository::list_live_photo_pairs() {
+    auto statement = database.prepare(
+        "SELECT id, image_asset_id, video_asset_id FROM live_photos ORDER BY id");
+
+    std::vector<core::LivePhotoLink> links;
+    while (statement.step()) {
+        links.push_back(core::LivePhotoLink{
+            .id = statement.column_int64(0),
+            .image_asset_id = statement.column_int64(1),
+            .video_asset_id = statement.column_int64(2),
+        });
+    }
+    return links;
+}
+
+std::optional<std::int64_t> SqliteAssetRepository::live_photo_video_for_image(
+    const std::int64_t image_id) {
+    auto statement = database.prepare(
+        "SELECT video_asset_id FROM live_photos WHERE image_asset_id = ?");
+    statement.bind(1, image_id);
+    if (!statement.step()) {
+        return std::nullopt;
+    }
+    return statement.column_int64(0);
+}
+
+std::optional<std::int64_t> SqliteAssetRepository::live_photo_image_for_video(
+    const std::int64_t video_id) {
+    auto statement = database.prepare(
+        "SELECT image_asset_id FROM live_photos WHERE video_asset_id = ?");
+    statement.bind(1, video_id);
+    if (!statement.step()) {
+        return std::nullopt;
+    }
+    return statement.column_int64(0);
+}
+
+void SqliteAssetRepository::link_live_photo(const std::int64_t image_asset_id,
+                                            const std::int64_t video_asset_id) {
+    auto statement = database.prepare(
+        "INSERT OR IGNORE INTO live_photos (image_asset_id, video_asset_id) VALUES (?, ?)");
+    statement.bind(1, image_asset_id);
+    statement.bind(2, video_asset_id);
+    statement.step();
+}
+
+void SqliteAssetRepository::unlink_live_photo(const std::int64_t image_asset_id) {
+    auto statement = database.prepare("DELETE FROM live_photos WHERE image_asset_id = ?");
+    statement.bind(1, image_asset_id);
+    statement.step();
+}
+
 void SqliteAssetRepository::erase(const std::int64_t id) {
+    {
+        auto links = database.prepare(
+            "DELETE FROM live_photos WHERE image_asset_id = ? OR video_asset_id = ?");
+        links.bind(1, id);
+        links.bind(2, id);
+        links.step();
+    }
+
     auto statement = database.prepare("DELETE FROM assets WHERE id = ? RETURNING id");
     statement.bind(1, id);
     if (!statement.step()) {

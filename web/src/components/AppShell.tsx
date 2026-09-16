@@ -11,7 +11,7 @@ import {
 } from 'lucide-react'
 import type { PropsWithChildren, ReactNode } from 'react'
 
-export type AppPage = 'photos' | 'map' | 'duplicates' | 'series' | 'favorites' | 'trash'
+export type AppPage = 'photos' | 'map' | 'duplicates' | 'series' | 'favorites' | 'trash' | 'settings'
 
 const navigation: Array<{ id: AppPage; label: string; icon: typeof Images; enabled: boolean }> = [
   { id: 'photos', label: 'Photos', icon: Images, enabled: true },
@@ -64,7 +64,11 @@ export const AppShell = ({
         ))}
       </nav>
 
-      <button className="nav-item settings" type="button">
+      <button
+        className={`nav-item settings ${page === 'settings' ? 'active' : ''}`}
+        type="button"
+        onClick={() => onNavigate('settings')}
+      >
         <Settings size={19} />
         <span>Settings</span>
       </button>

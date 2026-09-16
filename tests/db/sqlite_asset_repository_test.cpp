@@ -1,4 +1,5 @@
 #include "core/asset.hpp"
+#include "core/live_photo_sync.hpp"
 #include "db/database.hpp"
 #include "db/migration_runner.hpp"
 #include "db/sqlite_asset_repository.hpp"
@@ -198,6 +199,53 @@ TEST_F(SqliteAssetRepositoryTest, ErasesAssetRecord) {
     const auto created = repository.create(image());
     repository.erase(created.id);
     EXPECT_FALSE(repository.find_by_id(created.id).has_value());
+}
+
+TEST_F(SqliteAssetRepositoryTest, LinksLivePhotosAndHidesCompanionVideo) {
+    auto still = image("/library/IMG_0001.HEIC");
+    still.original_filename = "IMG_0001.HEIC";
+    const auto image_asset = repository.create(still);
+
+    auto motion = image("/library/IMG_0001.MOV");
+    motion.original_filename = "IMG_0001.MOV";
+    motion.media_type = core::MediaType::Video;
+    motion.sha256 = std::nullopt;
+    const auto video_asset = repository.create(motion);
+
+    repository.link_live_photo(image_asset.id, video_asset.id);
+
+    EXPECT_EQ(repository.live_photo_video_for_image(image_asset.id), video_asset.id);
+    EXPECT_EQ(repository.live_photo_image_for_video(video_asset.id), image_asset.id);
+    EXPECT_EQ(repository.list(10, 0).size(), 1);
+    EXPECT_EQ(repository.count(), 1);
+}
+
+TEST_F(SqliteAssetRepositoryTest, PrunesLongMovLivePhotoPair) {
+    auto still = image("/library/IMG_0001.HEIC");
+    still.original_filename = "IMG_0001.HEIC";
+    const auto image_asset = repository.create(still);
+
+    auto motion = image("/library/IMG_0001.MOV");
+    motion.original_filename = "IMG_0001.MOV";
+    motion.media_type = core::MediaType::Video;
+    motion.sha256 = std::nullopt;
+    const auto video_asset = repository.create(motion);
+
+    repository.link_live_photo(image_asset.id, video_asset.id);
+    repository.set_video_metadata(
+        video_asset.id,
+        core::VideoMetadata{
+            .duration_seconds = 18.0,
+            .width = 1920,
+            .height = 1080,
+            .captured_at = std::nullopt,
+            .codec = "h264",
+        });
+
+    core::sync_live_photo_pairs(repository);
+
+    EXPECT_TRUE(repository.list_live_photo_pairs().empty());
+    EXPECT_EQ(repository.list(10, 0).size(), 2);
 }
 
 }  // namespace geoframe::db
