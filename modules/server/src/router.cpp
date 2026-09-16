@@ -1,7 +1,10 @@
 #include "server/router.hpp"
 
+#include "core/map_clusterer.hpp"
+
 #include <nlohmann/json.hpp>
 
+#include <algorithm>
 #include <charconv>
 #include <filesystem>
 #include <fstream>
@@ -403,6 +406,68 @@ void Router::register_routes() {
             }
             assets_.set_status(id, core::AssetStatus::Active);
             return json_ok({{"id", id}, {"status", "active"}});
+        },
+    });
+
+    // ── GET /api/map/clusters?zoom=10 ─────────────────────────────────────
+    routes_.push_back({
+        "GET",
+        {"api", "map", "clusters"},
+        [this](const HttpRequest& req, const std::vector<std::string>&) -> HttpResponse {
+            const auto params = parse_query(req.query);
+            const auto zoom_str = params.count("zoom") ? params.at("zoom") : std::string{"10"};
+            int zoom = 10;
+            std::from_chars(zoom_str.data(), zoom_str.data() + zoom_str.size(), zoom);
+            zoom = std::clamp(zoom, 0, 22);
+
+            const auto status_str =
+                params.count("status") ? params.at("status") : std::string{"active"};
+            const core::AssetStatus status =
+                (status_str == "trashed") ? core::AssetStatus::Trashed
+                                          : core::AssetStatus::Active;
+
+            const auto points = assets_.list_geo_points(status);
+            const auto clusters = core::cluster_geo_assets(points, zoom);
+
+            json body;
+            body["type"] = "FeatureCollection";
+            body["features"] = json::array();
+
+            for (const auto& cluster : clusters) {
+                json feature;
+                feature["type"] = "Feature";
+                feature["geometry"] = {
+                    {"type", "Point"},
+                    {"coordinates", json::array({cluster.longitude, cluster.latitude})},
+                };
+
+                json properties;
+                properties["cluster"] = cluster.is_cluster;
+                properties["pointCount"] = cluster.asset_ids.size();
+                properties["assetIds"] = cluster.asset_ids;
+
+                if (!cluster.is_cluster && !cluster.asset_ids.empty()) {
+                    const auto asset = assets_.find_by_id(cluster.asset_ids.front());
+                    if (asset.has_value()) {
+                        properties["assetId"] = asset->id;
+                        properties["mediaType"] =
+                            (asset->media_type == core::MediaType::Image) ? "image" : "video";
+                        properties["favorite"] = asset->favorite;
+                        if (asset->thumbnail_path.has_value()) {
+                            properties["thumbnailUrl"] =
+                                media_url_with_version(asset->id, "thumbnail",
+                                                       *asset->thumbnail_path);
+                        } else {
+                            properties["thumbnailUrl"] = nullptr;
+                        }
+                    }
+                }
+
+                feature["properties"] = properties;
+                body["features"].push_back(feature);
+            }
+
+            return json_ok(body);
         },
     });
 

@@ -1,7 +1,7 @@
 import { AlertCircle, ImageOff } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
-import { AppShell } from '../components/AppShell'
+import { AppShell, type AppPage } from '../components/AppShell'
 import { Lightbox } from '../components/Lightbox'
 import { MediaCard } from '../components/MediaCard'
 import { ScanProgressBanner } from '../components/ScanProgressBanner'
@@ -52,7 +52,11 @@ const GallerySkeleton = () => (
   </div>
 )
 
-export const GalleryPage = () => {
+interface GalleryPageProps {
+  onNavigate: (page: AppPage) => void
+}
+
+export const GalleryPage = ({ onNavigate }: GalleryPageProps) => {
   const { items, total, loading, loadingMore, error, hasMore, loadMore } = useAssets()
   const { progress, active: progressActive } = useScanProgress()
   const [selectedId, setSelectedId] = useState<number | null>(null)
@@ -96,6 +100,8 @@ export const GalleryPage = () => {
 
   return (
     <AppShell
+      page="photos"
+      onNavigate={onNavigate}
       total={total}
       banner={progressActive && progress ? <ScanProgressBanner progress={progress} /> : null}
     >

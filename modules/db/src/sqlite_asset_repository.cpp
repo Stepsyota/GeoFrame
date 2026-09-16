@@ -327,6 +327,28 @@ void SqliteAssetRepository::set_status(const std::int64_t id, const core::AssetS
     }
 }
 
+std::vector<core::GeoAsset> SqliteAssetRepository::list_geo_points(
+    const core::AssetStatus status) {
+    auto statement = database.prepare(
+        "SELECT id, gps_lat, gps_lon, media_type, favorite FROM assets "
+        "WHERE status = ? AND gps_lat IS NOT NULL AND gps_lon IS NOT NULL "
+        "ORDER BY id");
+
+    statement.bind(1, to_string(status));
+
+    std::vector<core::GeoAsset> points;
+    while (statement.step()) {
+        points.push_back(core::GeoAsset{
+            .id = statement.column_int64(0),
+            .latitude = statement.column_double(1),
+            .longitude = statement.column_double(2),
+            .media_type = media_type_from_string(statement.column_text(3)),
+            .favorite = statement.column_int64(4) != 0,
+        });
+    }
+    return points;
+}
+
 std::int64_t SqliteAssetRepository::count(const core::AssetStatus status) {
     auto statement =
         database.prepare("SELECT COUNT(*) FROM assets WHERE status = ?");

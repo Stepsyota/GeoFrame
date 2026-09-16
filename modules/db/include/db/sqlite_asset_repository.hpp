@@ -26,6 +26,8 @@ public:
     void set_preview_path(std::int64_t id, const std::filesystem::path& path) override;
     void set_favorite(std::int64_t id, bool favorite) override;
     void set_status(std::int64_t id, core::AssetStatus status) override;
+    std::vector<core::GeoAsset> list_geo_points(
+        core::AssetStatus status = core::AssetStatus::Active) override;
 
 private:
     Database& database;

@@ -3,6 +3,7 @@ add_library(
     STATIC
         src/version.cpp
         src/event_bus.cpp
+        src/map_clusterer.cpp
         src/progress_tracker.cpp
 )
 add_library(GeoFrame::core ALIAS geoframe_core)

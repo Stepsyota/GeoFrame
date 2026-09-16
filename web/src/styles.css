@@ -97,6 +97,11 @@ button:focus-visible {
   background: #252d20;
 }
 
+.nav-item:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .settings {
   margin-top: auto;
 }
@@ -591,6 +596,71 @@ button:focus-visible {
 
   .lightbox-nav-next {
     right: 6px;
+  }
+}
+
+.map-page {
+  position: relative;
+  min-height: calc(100vh - 180px);
+}
+
+.map-canvas {
+  overflow: hidden;
+  width: 100%;
+  min-height: 520px;
+  height: calc(100vh - 180px);
+  border: 1px solid #30362d;
+  border-radius: 18px;
+  background: #191c17;
+}
+
+.map-empty,
+.map-error {
+  margin-bottom: 16px;
+}
+
+.map-popup {
+  display: grid;
+  gap: 8px;
+}
+
+.map-popup-thumb {
+  display: block;
+  width: 100%;
+  border-radius: 8px;
+}
+
+.map-popup-fallback {
+  display: grid;
+  place-items: center;
+  min-height: 120px;
+  border-radius: 8px;
+  background: #20241e;
+  color: #8e9789;
+  font-size: 12px;
+}
+
+.map-popup p {
+  margin: 0;
+  color: #d5dbd0;
+  font-size: 12px;
+}
+
+.maplibregl-popup-content {
+  padding: 10px;
+  border-radius: 12px;
+  background: #191c17;
+  color: #ecf0e9;
+}
+
+.maplibregl-popup-close-button {
+  color: #ecf0e9;
+}
+
+@media (max-width: 900px) {
+  .map-canvas {
+    min-height: 420px;
+    height: calc(100vh - 220px);
   }
 }
 

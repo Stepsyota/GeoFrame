@@ -81,7 +81,7 @@ Python-код не развиваем. Используем как reference п�
 - [ ] Просмотр фото: дата, место, камера, полный EXIF, скачать оригинал
 - [ ] Избранное
 - [ ] Удаление → Trash
-- [ ] Карта с кластерами (центральная фича MVP)
+- [x] Карта с кластерами (GeoJSON endpoint + MapLibre)
 
 #### Инструменты
 
@@ -188,8 +188,8 @@ GeoFrame читает source folder. Внешние изменения файл�
 8. **HTTP API + CLI + TLS** — REST + Boost.Beast + self-signed cert + CLI subcommands ✅
 9. **React gallery** — каркас, demo mode, real API + pagination ✅
 10. **WebSocket progress** — live прогресс индексации (`/ws/events`) ✅
-11. **Map** — GeoJSON endpoint + MapLibre — следующий шаг
-12. **Duplicates + series** — детекция + UI
+11. **Map** — GeoJSON endpoint + MapLibre ✅
+12. **Duplicates + series** — детекция + UI — следующий шаг
 13. **Удалить Python-прототип**
 
 ## Критерий готовности MVP
