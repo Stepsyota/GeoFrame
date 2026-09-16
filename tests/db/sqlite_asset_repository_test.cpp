@@ -220,6 +220,23 @@ TEST_F(SqliteAssetRepositoryTest, LinksLivePhotosAndHidesCompanionVideo) {
     EXPECT_EQ(repository.count(), 1);
 }
 
+TEST_F(SqliteAssetRepositoryTest, FiltersAssetsByFilenameSearch) {
+    auto first = image("/library/IMG_0001.HEIC");
+    first.original_filename = "IMG_0001.HEIC";
+    repository.create(first);
+
+    auto second = image("/library/VID_0002.MOV");
+    second.original_filename = "VID_0002.MOV";
+    second.media_type = core::MediaType::Video;
+    second.sha256 = std::nullopt;
+    repository.create(second);
+
+    const auto matches = repository.list(10, 0, core::AssetStatus::Active, std::nullopt, "vid");
+    EXPECT_EQ(matches.size(), 1);
+    EXPECT_EQ(matches[0].original_filename, "VID_0002.MOV");
+    EXPECT_EQ(repository.count(core::AssetStatus::Active, std::nullopt, "vid"), 1);
+}
+
 TEST_F(SqliteAssetRepositoryTest, PrunesLongMovLivePhotoPair) {
     auto still = image("/library/IMG_0001.HEIC");
     still.original_filename = "IMG_0001.HEIC";

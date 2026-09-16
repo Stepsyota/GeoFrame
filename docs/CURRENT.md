@@ -49,7 +49,7 @@
 
 - [x] Указать source folder — GeoFrame индексирует, **не копирует** оригиналы (CLI `--source`; путь в Settings UI)
 - [x] GeoFrame data dir (по умолчанию `~/.local/share/geoframe/`, настраивается; отображается в Settings UI)
-- [ ] Cache: `thumbnails/`, `previews/` в data dir
+- [x] Cache: `thumbnails/`, `previews/` в data dir (пути и размер в Settings)
 - [x] Повторный scan: не создавать asset повторно для того же `source_path`
 - [ ] Не отслеживать внешние изменения файлов
 

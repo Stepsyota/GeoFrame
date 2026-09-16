@@ -210,7 +210,8 @@ std::optional<core::Asset> SqliteAssetRepository::find_by_source_path(
 std::vector<core::Asset> SqliteAssetRepository::list(const std::size_t limit,
                                                      const std::size_t offset,
                                                      const std::optional<core::AssetStatus> status,
-                                                     const std::optional<bool> favorite) {
+                                                     const std::optional<bool> favorite,
+                                                     const std::optional<std::string> search) {
     if (limit > static_cast<std::size_t>(std::numeric_limits<std::int64_t>::max()) ||
         offset > static_cast<std::size_t>(std::numeric_limits<std::int64_t>::max())) {
         throw std::invalid_argument("Pagination value exceeds SQLite integer range");
@@ -223,6 +224,9 @@ std::vector<core::Asset> SqliteAssetRepository::list(const std::size_t limit,
     }
     if (favorite.has_value()) {
         conditions.push_back("favorite = ?");
+    }
+    if (search.has_value() && !search->empty()) {
+        conditions.push_back("instr(lower(original_filename), lower(?)) > 0");
     }
     conditions.push_back(std::string{kExcludeLivePhotoVideos});
     if (!conditions.empty()) {
@@ -244,6 +248,9 @@ std::vector<core::Asset> SqliteAssetRepository::list(const std::size_t limit,
     }
     if (favorite.has_value()) {
         statement.bind(param++, static_cast<std::int64_t>(*favorite));
+    }
+    if (search.has_value() && !search->empty()) {
+        statement.bind(param++, *search);
     }
     statement.bind(param++, static_cast<std::int64_t>(limit));
     statement.bind(param,   static_cast<std::int64_t>(offset));
@@ -405,17 +412,25 @@ std::vector<core::GeoAsset> SqliteAssetRepository::list_geo_points(
 }
 
 std::int64_t SqliteAssetRepository::count(const core::AssetStatus status,
-                                         const std::optional<bool> favorite) {
+                                         const std::optional<bool> favorite,
+                                         const std::optional<std::string> search) {
     std::string sql = "SELECT COUNT(*) FROM assets WHERE status = ? AND "
                     + std::string{kExcludeLivePhotoVideos};
     if (favorite.has_value()) {
         sql += " AND favorite = ?";
     }
+    if (search.has_value() && !search->empty()) {
+        sql += " AND instr(lower(original_filename), lower(?)) > 0";
+    }
 
     auto statement = database.prepare(sql);
-    statement.bind(1, to_string(status));
+    int param = 1;
+    statement.bind(param++, to_string(status));
     if (favorite.has_value()) {
-        statement.bind(2, static_cast<std::int64_t>(*favorite));
+        statement.bind(param++, static_cast<std::int64_t>(*favorite));
+    }
+    if (search.has_value() && !search->empty()) {
+        statement.bind(param++, *search);
     }
     if (!statement.step()) {
         throw std::runtime_error("COUNT query returned no rows");

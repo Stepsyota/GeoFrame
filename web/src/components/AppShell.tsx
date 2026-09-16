@@ -29,6 +29,8 @@ interface AppShellProps extends PropsWithChildren {
   title?: string
   eyebrow?: string
   banner?: ReactNode
+  searchQuery?: string
+  onSearchQueryChange?: (query: string) => void
 }
 
 export const AppShell = ({
@@ -39,6 +41,8 @@ export const AppShell = ({
   title = 'Photos',
   eyebrow = 'Your library',
   banner,
+  searchQuery,
+  onSearchQueryChange,
 }: AppShellProps) => (
   <div className="app-shell">
     <aside className="sidebar">
@@ -82,9 +86,22 @@ export const AppShell = ({
         </div>
         <div className="topbar-actions">
           {typeof total === 'number' && <span className="asset-count">{total} assets</span>}
-          <button className="icon-button" type="button" aria-label="Search library">
-            <Search size={21} />
-          </button>
+          {onSearchQueryChange ? (
+            <label className="search-field">
+              <Search size={18} aria-hidden="true" />
+              <input
+                type="search"
+                value={searchQuery ?? ''}
+                placeholder="Search filenames…"
+                aria-label="Search library"
+                onChange={(event) => onSearchQueryChange(event.target.value)}
+              />
+            </label>
+          ) : (
+            <button className="icon-button" type="button" aria-label="Search library" disabled>
+              <Search size={21} />
+            </button>
+          )}
         </div>
       </header>
       {banner}

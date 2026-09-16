@@ -6,6 +6,13 @@ export interface LibraryStatus {
     active: number
     trashed: number
   }
+  cache: {
+    thumbnailsDir: string
+    previewsDir: string
+    thumbnailsMB: number
+    previewsMB: number
+    totalMB: number
+  }
   disk?: {
     availableMB: number
     totalMB: number

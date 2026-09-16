@@ -1,5 +1,5 @@
 import { AlertCircle, ImageOff } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 
 import { AppShell, type AppPage } from '../components/AppShell'
 import { Lightbox } from '../components/Lightbox'
@@ -57,8 +57,11 @@ interface GalleryPageProps {
 }
 
 export const GalleryPage = ({ onNavigate }: GalleryPageProps) => {
+  const [searchQuery, setSearchQuery] = useState('')
+  const deferredSearch = useDeferredValue(searchQuery.trim())
+  const searchFilter = deferredSearch.length > 0 ? deferredSearch : undefined
   const { items, total, loading, loadingMore, error, hasMore, loadMore, updateItem, removeItem } =
-    useAssets()
+    useAssets({ search: searchFilter })
   const { progress, active: progressActive } = useScanProgress()
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const loadMoreRef = useRef<HTMLDivElement | null>(null)
@@ -104,6 +107,8 @@ export const GalleryPage = ({ onNavigate }: GalleryPageProps) => {
       page="photos"
       onNavigate={onNavigate}
       total={total}
+      searchQuery={searchQuery}
+      onSearchQueryChange={setSearchQuery}
       banner={progressActive && progress ? <ScanProgressBanner progress={progress} /> : null}
     >
       {loading && <GallerySkeleton />}
@@ -126,8 +131,12 @@ export const GalleryPage = ({ onNavigate }: GalleryPageProps) => {
         <section className="state-card">
           <ImageOff size={30} />
           <div>
-            <h2>Your library is empty</h2>
-            <p>Run a scan to start indexing your photos.</p>
+            <h2>{searchFilter ? 'No matching photos' : 'Your library is empty'}</h2>
+            <p>
+              {searchFilter
+                ? `Nothing found for “${searchFilter}”. Try another filename.`
+                : 'Run a scan to start indexing your photos.'}
+            </p>
           </div>
         </section>
       )}

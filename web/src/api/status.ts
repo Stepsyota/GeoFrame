@@ -7,6 +7,13 @@ const demoStatus: LibraryStatus = {
   dataDir: '~/.local/share/geoframe',
   scanning: false,
   assets: { active: 42, trashed: 3 },
+  cache: {
+    thumbnailsDir: '~/.local/share/geoframe/cache/thumbnails',
+    previewsDir: '~/.local/share/geoframe/cache/previews',
+    thumbnailsMB: 120,
+    previewsMB: 840,
+    totalMB: 960,
+  },
   disk: { availableMB: 128_000, totalMB: 512_000 },
 }
 

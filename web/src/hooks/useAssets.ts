@@ -28,6 +28,7 @@ export const useAssets = (options?: AssetListOptions): AssetsState => {
   const loadingMoreRef = useRef(false)
   const listStatus = options?.status
   const listFavorite = options?.favorite
+  const listSearch = options?.search
 
   const applyPage = useCallback((page: AssetPage, append: boolean) => {
     if (!page || !Array.isArray(page.items)) {
@@ -44,13 +45,14 @@ export const useAssets = (options?: AssetListOptions): AssetsState => {
       return getAssets(PAGE_SIZE, 0, signal, {
         status: listStatus,
         favorite: listFavorite,
+        search: listSearch,
       }).then((page) => {
         applyPage(page, false)
         setLoading(false)
         setError(null)
       })
     },
-    [applyPage, listFavorite, listStatus],
+    [applyPage, listFavorite, listSearch, listStatus],
   )
 
   useEffect(() => {
@@ -78,6 +80,7 @@ export const useAssets = (options?: AssetListOptions): AssetsState => {
     getAssets(PAGE_SIZE, offsetRef.current, undefined, {
       status: listStatus,
       favorite: listFavorite,
+      search: listSearch,
     })
       .then((page) => {
         applyPage(page, true)
@@ -90,7 +93,7 @@ export const useAssets = (options?: AssetListOptions): AssetsState => {
         loadingMoreRef.current = false
         setLoadingMore(false)
       })
-  }, [applyPage, items.length, listFavorite, listStatus, loading, total])
+  }, [applyPage, items.length, listFavorite, listSearch, listStatus, loading, total])
 
   const refresh = useCallback(() => {
     setLoading(true)

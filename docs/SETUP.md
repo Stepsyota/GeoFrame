@@ -135,6 +135,36 @@ cmake --build build --parallel
 | `--port <n>` | `8443` | HTTPS-порт |
 | `--threads <n>` | `CPU_count - 1` | Число worker-потоков |
 | `--skip-tls` | `false` | HTTP вместо HTTPS (только для dev) |
+| `--web-dir <path>` | `./web/dist` | Папка со сборкой React UI (см. [Production](#production-одним-процессом)) |
+
+### Production: одним процессом
+
+Соберите UI и запустите сервер — GeoFrame раздаёт и API, и статику:
+
+```bash
+# 1. Собрать backend (Release)
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --parallel
+
+# 2. Собрать frontend
+cd web
+npm install
+npm run build
+cd ..
+
+# 3. Запустить (из корня репозитория, чтобы нашёлся web/dist)
+./build/apps/geoframe/geoframe serve \
+    --source /path/to/your/photos \
+    --data-dir ~/.local/share/geoframe \
+    --web-dir web/dist \
+    --port 8443
+```
+
+Открыть: [https://localhost:8443](https://localhost:8443) (или `--skip-tls --port 8080` для HTTP).
+
+Для LAN-доступа с телефона сервер слушает `0.0.0.0` по умолчанию — откройте `https://<IP-вашего-ПК>:8443`.
+
+Путь к UI можно задать через переменную окружения `GEOFRAME_WEB_DIR` вместо `--web-dir`.
 
 ---
 
@@ -208,7 +238,7 @@ Vite проксирует `/api` и `/ws` на `https://localhost:8443`.
 
 ### Production build
 
-Собирает React в статические файлы, которые GeoFrame будет раздавать сам:
+Собирает React в статические файлы, которые GeoFrame раздаёт сам:
 
 ```bash
 cd web
@@ -216,7 +246,8 @@ npm run build
 # Результат в web/dist/
 ```
 
-> После сборки положите `web/dist/` рядом с бинарником или укажите путь. По умолчанию GeoFrame ищет `web/dist/` относительно рабочей директории.
+Полный сценарий запуска — в разделе [Production: одним процессом](#production-одним-процессом) выше.
+По умолчанию GeoFrame ищет `web/dist/` относительно текущей рабочей директории.
 
 ### Frontend-команды
 

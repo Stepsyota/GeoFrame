@@ -115,6 +115,14 @@ export const SettingsPage = ({ onNavigate }: SettingsPageProps) => {
                 <dt>GeoFrame data dir</dt>
                 <dd>{status.dataDir}</dd>
               </div>
+              <div>
+                <dt>Thumbnails cache</dt>
+                <dd>{status.cache.thumbnailsDir}</dd>
+              </div>
+              <div>
+                <dt>Previews cache</dt>
+                <dd>{status.cache.previewsDir}</dd>
+              </div>
             </dl>
           </section>
 
@@ -127,6 +135,13 @@ export const SettingsPage = ({ onNavigate }: SettingsPageProps) => {
               <div>
                 <dt>Indexed assets</dt>
                 <dd>{status.assets.active} active, {status.assets.trashed} in trash</dd>
+              </div>
+              <div>
+                <dt>Generated cache</dt>
+                <dd>
+                  {formatMegabytes(status.cache.totalMB)} total ({formatMegabytes(status.cache.thumbnailsMB)}{' '}
+                  thumbnails, {formatMegabytes(status.cache.previewsMB)} previews)
+                </dd>
               </div>
               {status.disk && (
                 <div>

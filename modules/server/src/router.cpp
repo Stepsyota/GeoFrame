@@ -250,6 +250,25 @@ void erase_asset_with_companion(core::IAssetRepository& assets, const core::Asse
     assets.erase(asset.id);
 }
 
+std::uint64_t directory_size_bytes(const std::filesystem::path& root) {
+    std::error_code ec;
+    if (!std::filesystem::exists(root, ec)) {
+        return 0;
+    }
+
+    std::uint64_t total = 0;
+    for (std::filesystem::recursive_directory_iterator it{root, ec}, end;
+         !ec && it != end; it.increment(ec)) {
+        if (it->is_regular_file(ec)) {
+            const auto size = std::filesystem::file_size(it->path(), ec);
+            if (!ec) {
+                total += size;
+            }
+        }
+    }
+    return total;
+}
+
 bool confirms_action(const HttpRequest& req, const std::string& expected) {
     if (req.body.empty()) {
         return false;
@@ -350,6 +369,7 @@ void Router::register_routes() {
                 params.count("offset") ? params.at("offset") : std::string{"0"};
             const auto favorite_str =
                 params.count("favorite") ? params.at("favorite") : std::string{};
+            const auto search_query = params.count("q") ? params.at("q") : std::string{};
 
             const core::AssetStatus status =
                 (status_str == "trashed") ? core::AssetStatus::Trashed
@@ -368,8 +388,13 @@ void Router::register_routes() {
             std::from_chars(offset_str.data(), offset_str.data() + offset_str.size(), offset);
             limit = std::min(limit, std::size_t{200});
 
-            const auto items = assets_.list(limit, offset, status, favorite_filter);
-            const auto total = assets_.count(status, favorite_filter);
+            std::optional<std::string> search_filter;
+            if (!search_query.empty()) {
+                search_filter = search_query;
+            }
+
+            const auto items = assets_.list(limit, offset, status, favorite_filter, search_filter);
+            const auto total = assets_.count(status, favorite_filter, search_filter);
             const auto live_photos = live_photo_video_map(assets_);
 
             json body;
@@ -766,6 +791,20 @@ void Router::register_routes() {
                 body["source"] = config_.source.string();
             }
             body["dataDir"] = config_.data_dir.string();
+
+            const auto thumb_dir = config_.data_dir / "cache" / "thumbnails";
+            const auto preview_dir = config_.data_dir / "cache" / "previews";
+            const auto thumb_bytes = directory_size_bytes(thumb_dir);
+            const auto preview_bytes = directory_size_bytes(preview_dir);
+            body["cache"]["thumbnailsDir"] = thumb_dir.string();
+            body["cache"]["previewsDir"] = preview_dir.string();
+            body["cache"]["thumbnailsMB"] =
+                static_cast<std::int64_t>(thumb_bytes / (1024 * 1024));
+            body["cache"]["previewsMB"] =
+                static_cast<std::int64_t>(preview_bytes / (1024 * 1024));
+            body["cache"]["totalMB"] =
+                static_cast<std::int64_t>((thumb_bytes + preview_bytes) / (1024 * 1024));
+
             if (!ec) {
                 body["disk"]["availableMB"] =
                     static_cast<std::int64_t>(space.available / (1024 * 1024));

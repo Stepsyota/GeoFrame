@@ -13,6 +13,10 @@ const filterDemoPage = (options?: AssetListOptions): AssetPage => {
   } else if (options?.favorite === false) {
     items = items.filter((item) => !item.favorite)
   }
+  if (options?.search) {
+    const query = options.search.toLowerCase()
+    items = items.filter((item) => item.originalFilename.toLowerCase().includes(query))
+  }
   return {
     items,
     total: items.length,
@@ -40,6 +44,9 @@ export const getAssets = async (
     query.set('favorite', 'true')
   } else if (options?.favorite === false) {
     query.set('favorite', 'false')
+  }
+  if (options?.search) {
+    query.set('q', options.search)
   }
 
   const response = await fetch(`/api/assets?${query}`, {

@@ -33,9 +33,11 @@ public:
         const std::filesystem::path& source_path) = 0;
     virtual std::vector<Asset> list(std::size_t limit, std::size_t offset,
                                     std::optional<AssetStatus> status = std::nullopt,
-                                    std::optional<bool> favorite = std::nullopt) = 0;
+                                    std::optional<bool> favorite = std::nullopt,
+                                    std::optional<std::string> search = std::nullopt) = 0;
     virtual std::int64_t count(AssetStatus status = AssetStatus::Active,
-                               std::optional<bool> favorite = std::nullopt) = 0;
+                               std::optional<bool> favorite = std::nullopt,
+                               std::optional<std::string> search = std::nullopt) = 0;
     virtual void set_sha256(std::int64_t id, std::string_view sha256) = 0;
     virtual void set_metadata(std::int64_t id, const AssetMetadata& metadata) = 0;
     virtual void set_video_metadata(std::int64_t id, const VideoMetadata& metadata) = 0;

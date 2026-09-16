@@ -37,6 +37,7 @@ export interface AssetDetail extends AssetSummary {
 export interface AssetListOptions {
   status?: AssetStatus
   favorite?: boolean
+  search?: string
 }
 
 export interface AssetPage {
