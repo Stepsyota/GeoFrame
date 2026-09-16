@@ -1,7 +1,13 @@
-import { ChevronLeft, ChevronRight, Download, Heart, Trash2, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Download, Heart, RotateCcw, Trash2, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
-import { getAssetById, setAssetFavorite, trashAsset } from '../api/assets'
+import {
+  deleteAssetPermanently,
+  getAssetById,
+  restoreAsset,
+  setAssetFavorite,
+  trashAsset,
+} from '../api/assets'
 import type { AssetDetail, AssetSummary } from '../types/asset'
 
 interface LightboxProps {
@@ -13,6 +19,9 @@ interface LightboxProps {
   onNext: () => void
   onFavoriteChange?: (favorite: boolean) => void
   onTrash?: () => void
+  mode?: 'library' | 'trash'
+  onRestore?: () => void
+  onDeletePermanent?: () => void
 }
 
 const imageSrc = (asset: AssetSummary) => asset.previewUrl ?? asset.thumbnailUrl
@@ -53,6 +62,9 @@ export const Lightbox = ({
   onNext,
   onFavoriteChange,
   onTrash,
+  mode = 'library',
+  onRestore,
+  onDeletePermanent,
 }: LightboxProps) => {
   const [detail, setDetail] = useState<AssetDetail | null>(null)
   const [pendingFavorite, setPendingFavorite] = useState<boolean | null>(null)
@@ -115,6 +127,32 @@ export const Lightbox = ({
       .finally(() => setBusy(false))
   }
 
+  const restoreFromTrash = () => {
+    if (busy) {
+      return
+    }
+    setBusy(true)
+    void restoreAsset(asset.id)
+      .then(() => {
+        onRestore?.()
+        onClose()
+      })
+      .finally(() => setBusy(false))
+  }
+
+  const deletePermanent = () => {
+    if (busy || !window.confirm('Delete this file permanently? This cannot be undone.')) {
+      return
+    }
+    setBusy(true)
+    void deleteAssetPermanently(asset.id)
+      .then(() => {
+        onDeletePermanent?.()
+        onClose()
+      })
+      .finally(() => setBusy(false))
+  }
+
   return (
     <div className="lightbox" role="dialog" aria-modal="true" aria-label={asset.originalFilename}>
       <button className="lightbox-backdrop" type="button" aria-label="Close" onClick={onClose} />
@@ -122,15 +160,17 @@ export const Lightbox = ({
       <header className="lightbox-toolbar">
         <p className="lightbox-title">{asset.originalFilename}</p>
         <div className="lightbox-actions">
-          <button
-            className={`lightbox-action ${favorite ? 'active' : ''}`}
-            type="button"
-            aria-label={favorite ? 'Remove from favorites' : 'Add to favorites'}
-            disabled={busy}
-            onClick={toggleFavorite}
-          >
-            <Heart size={20} fill={favorite ? 'currentColor' : 'none'} />
-          </button>
+          {mode === 'library' && (
+            <button
+              className={`lightbox-action ${favorite ? 'active' : ''}`}
+              type="button"
+              aria-label={favorite ? 'Remove from favorites' : 'Add to favorites'}
+              disabled={busy}
+              onClick={toggleFavorite}
+            >
+              <Heart size={20} fill={favorite ? 'currentColor' : 'none'} />
+            </button>
+          )}
           <a
             className="lightbox-action"
             href={`/api/assets/${asset.id}/original`}
@@ -139,15 +179,38 @@ export const Lightbox = ({
           >
             <Download size={20} />
           </a>
-          <button
-            className="lightbox-action danger"
-            type="button"
-            aria-label="Move to trash"
-            disabled={busy}
-            onClick={moveToTrash}
-          >
-            <Trash2 size={20} />
-          </button>
+          {mode === 'trash' ? (
+            <>
+              <button
+                className="lightbox-action"
+                type="button"
+                aria-label="Restore photo"
+                disabled={busy}
+                onClick={restoreFromTrash}
+              >
+                <RotateCcw size={20} />
+              </button>
+              <button
+                className="lightbox-action danger"
+                type="button"
+                aria-label="Delete permanently"
+                disabled={busy}
+                onClick={deletePermanent}
+              >
+                <Trash2 size={20} />
+              </button>
+            </>
+          ) : (
+            <button
+              className="lightbox-action danger"
+              type="button"
+              aria-label="Move to trash"
+              disabled={busy}
+              onClick={moveToTrash}
+            >
+              <Trash2 size={20} />
+            </button>
+          )}
           <button className="lightbox-close" type="button" aria-label="Close" onClick={onClose}>
             <X size={22} />
           </button>

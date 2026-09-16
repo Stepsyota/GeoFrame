@@ -194,4 +194,10 @@ TEST_F(SqliteAssetRepositoryTest, SetsVideoMetadata) {
     EXPECT_EQ(updated->captured_at, "2026-09-15T10:00:00");
 }
 
+TEST_F(SqliteAssetRepositoryTest, ErasesAssetRecord) {
+    const auto created = repository.create(image());
+    repository.erase(created.id);
+    EXPECT_FALSE(repository.find_by_id(created.id).has_value());
+}
+
 }  // namespace geoframe::db

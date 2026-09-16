@@ -7,10 +7,11 @@ import {
   Search,
   Settings,
   Sparkles,
+  Trash2,
 } from 'lucide-react'
 import type { PropsWithChildren, ReactNode } from 'react'
 
-export type AppPage = 'photos' | 'map' | 'duplicates' | 'series' | 'favorites'
+export type AppPage = 'photos' | 'map' | 'duplicates' | 'series' | 'favorites' | 'trash'
 
 const navigation: Array<{ id: AppPage; label: string; icon: typeof Images; enabled: boolean }> = [
   { id: 'photos', label: 'Photos', icon: Images, enabled: true },
@@ -18,6 +19,7 @@ const navigation: Array<{ id: AppPage; label: string; icon: typeof Images; enabl
   { id: 'duplicates', label: 'Duplicates', icon: Copy, enabled: true },
   { id: 'series', label: 'Series', icon: GalleryHorizontalEnd, enabled: true },
   { id: 'favorites', label: 'Favorites', icon: Heart, enabled: true },
+  { id: 'trash', label: 'Trash', icon: Trash2, enabled: true },
 ]
 
 interface AppShellProps extends PropsWithChildren {

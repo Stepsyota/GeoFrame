@@ -417,6 +417,14 @@ std::int64_t SqliteAssetRepository::count(const core::AssetStatus status,
     return statement.column_int64(0);
 }
 
+void SqliteAssetRepository::erase(const std::int64_t id) {
+    auto statement = database.prepare("DELETE FROM assets WHERE id = ? RETURNING id");
+    statement.bind(1, id);
+    if (!statement.step()) {
+        throw std::out_of_range("Asset not found");
+    }
+}
+
 void SqliteAssetRepository::set_video_metadata(const std::int64_t id,
                                                const core::VideoMetadata& metadata) {
     auto statement = database.prepare(

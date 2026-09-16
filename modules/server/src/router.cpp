@@ -178,6 +178,33 @@ json asset_to_json(const core::Asset& a) {
     return obj;
 }
 
+void remove_file_quietly(const std::filesystem::path& path) {
+    if (path.empty()) {
+        return;
+    }
+    std::error_code ec;
+    std::filesystem::remove(path, ec);
+}
+
+void remove_asset_files(const core::Asset& asset) {
+    remove_file_quietly(asset.source_path);
+    if (asset.thumbnail_path.has_value()) {
+        remove_file_quietly(*asset.thumbnail_path);
+    }
+    if (asset.preview_path.has_value()) {
+        remove_file_quietly(*asset.preview_path);
+    }
+}
+
+bool confirms_action(const HttpRequest& req, const std::string& expected) {
+    if (req.body.empty()) {
+        return false;
+    }
+    const auto parsed = json::parse(req.body, nullptr, false);
+    return parsed.is_object() && parsed.contains("confirm") && parsed["confirm"].is_string()
+           && parsed["confirm"].get<std::string>() == expected;
+}
+
 }  // namespace
 
 // ── Router ─────────────────────────────────────────────────────────────────
@@ -417,6 +444,57 @@ void Router::register_routes() {
             }
             assets_.set_status(id, core::AssetStatus::Active);
             return json_ok({{"id", id}, {"status", "active"}});
+        },
+    });
+
+    // ── DELETE /api/assets/{id} ───────────────────────────────────────────
+    routes_.push_back({
+        "DELETE",
+        {"api", "assets", "{id}"},
+        [this](const HttpRequest& req, const std::vector<std::string>& caps) -> HttpResponse {
+            if (!confirms_action(req, "DELETE")) {
+                return json_error(400, R"(Confirmation required: {"confirm":"DELETE"})");
+            }
+
+            const auto id = require_id(caps[0]);
+            const auto asset = assets_.find_by_id(id);
+            if (!asset.has_value()) {
+                return not_found("Asset not found");
+            }
+            if (asset->status != core::AssetStatus::Trashed) {
+                return json_error(400, "Only trashed assets can be permanently deleted");
+            }
+
+            remove_asset_files(*asset);
+            assets_.erase(id);
+            return json_ok({{"id", id}, {"deleted", true}});
+        },
+    });
+
+    // ── POST /api/trash/empty ─────────────────────────────────────────────
+    routes_.push_back({
+        "POST",
+        {"api", "trash", "empty"},
+        [this](const HttpRequest& req, const std::vector<std::string>&) -> HttpResponse {
+            if (!confirms_action(req, "CLEAR TRASH")) {
+                return json_error(400, R"(Confirmation required: {"confirm":"CLEAR TRASH"})");
+            }
+
+            std::size_t deleted = 0;
+            while (true) {
+                const auto batch =
+                    assets_.list(200, 0, core::AssetStatus::Trashed, std::nullopt);
+                if (batch.empty()) {
+                    break;
+                }
+                for (const auto& asset : batch) {
+                    remove_asset_files(asset);
+                    assets_.erase(asset.id);
+                    ++deleted;
+                }
+            }
+
+            return json_ok({{"deleted", deleted}});
         },
     });
 

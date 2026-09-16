@@ -128,3 +128,73 @@ export const trashAsset = async (id: number): Promise<void> => {
     throw new Error(`GeoFrame API returned ${response.status}`)
   }
 }
+
+export const restoreAsset = async (id: number): Promise<void> => {
+  if (demoMode) {
+    const asset = demoAssetPage.items.find((item) => item.id === id)
+    if (!asset) {
+      throw new Error(`Demo asset ${id} not found`)
+    }
+    asset.status = 'active'
+    return
+  }
+
+  const response = await fetch(`/api/assets/${id}/restore`, {
+    method: 'POST',
+    headers: { Accept: 'application/json' },
+  })
+
+  if (!response.ok) {
+    throw new Error(`GeoFrame API returned ${response.status}`)
+  }
+}
+
+export const deleteAssetPermanently = async (id: number): Promise<void> => {
+  if (demoMode) {
+    const index = demoAssetPage.items.findIndex((item) => item.id === id)
+    if (index < 0) {
+      throw new Error(`Demo asset ${id} not found`)
+    }
+    demoAssetPage.items.splice(index, 1)
+    demoAssetPage.total = demoAssetPage.items.length
+    return
+  }
+
+  const response = await fetch(`/api/assets/${id}`, {
+    method: 'DELETE',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ confirm: 'DELETE' }),
+  })
+
+  if (!response.ok) {
+    throw new Error(`GeoFrame API returned ${response.status}`)
+  }
+}
+
+export const clearTrash = async (): Promise<number> => {
+  if (demoMode) {
+    const before = demoAssetPage.items.length
+    demoAssetPage.items = demoAssetPage.items.filter((item) => item.status !== 'trashed')
+    demoAssetPage.total = demoAssetPage.items.length
+    return before - demoAssetPage.items.length
+  }
+
+  const response = await fetch('/api/trash/empty', {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ confirm: 'CLEAR TRASH' }),
+  })
+
+  if (!response.ok) {
+    throw new Error(`GeoFrame API returned ${response.status}`)
+  }
+
+  const body = (await response.json()) as { deleted: number }
+  return body.deleted
+}

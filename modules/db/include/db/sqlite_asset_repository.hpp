@@ -34,6 +34,7 @@ public:
         core::AssetStatus status = core::AssetStatus::Active) override;
     std::vector<core::TimedAsset> list_timed_assets(
         core::AssetStatus status = core::AssetStatus::Active) override;
+    void erase(std::int64_t id) override;
 
 private:
     Database& database;

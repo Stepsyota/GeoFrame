@@ -41,6 +41,7 @@ public:
         AssetStatus status = AssetStatus::Active) = 0;
     virtual std::vector<TimedAsset> list_timed_assets(
         AssetStatus status = AssetStatus::Active) = 0;
+    virtual void erase(std::int64_t id) = 0;
 };
 
 }  // namespace geoframe::core
