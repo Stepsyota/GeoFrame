@@ -4,6 +4,8 @@ add_library(
         src/version.cpp
         src/event_bus.cpp
         src/map_clusterer.cpp
+        src/duplicate_grouper.cpp
+        src/series_detector.cpp
         src/progress_tracker.cpp
 )
 add_library(GeoFrame::core ALIAS geoframe_core)

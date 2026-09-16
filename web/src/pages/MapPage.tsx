@@ -3,9 +3,13 @@ import * as maplibregl from 'maplibre-gl'
 import { useEffect, useRef, useState } from 'react'
 
 import '../maplibre_setup'
+import { getAssetById } from '../api/assets'
 import { getMapClusters } from '../api/map'
 import { AppShell, type AppPage } from '../components/AppShell'
-import type { MapFeatureProperties } from '../types/map'
+import { Lightbox } from '../components/Lightbox'
+import { PhotoMarkerManager } from '../map/photo_markers'
+import type { AssetSummary } from '../types/asset'
+import type { MapFeature } from '../types/map'
 
 import 'maplibre-gl/dist/maplibre-gl.css'
 
@@ -18,15 +22,18 @@ interface MapPageProps {
 export const MapPage = ({ onNavigate }: MapPageProps) => {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
-  const popupRef = useRef<maplibregl.Popup | null>(null)
+  const markerManagerRef = useRef(new PhotoMarkerManager())
   const [error, setError] = useState<string | null>(null)
   const [geoCount, setGeoCount] = useState(0)
   const [loaded, setLoaded] = useState(false)
+  const [selectedAsset, setSelectedAsset] = useState<AssetSummary | null>(null)
 
   useEffect(() => {
     if (!containerRef.current) {
       return
     }
+
+    const markerManager = markerManagerRef.current
 
     const map = new maplibregl.Map({
       container: containerRef.current,
@@ -38,111 +45,60 @@ export const MapPage = ({ onNavigate }: MapPageProps) => {
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right')
     map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right')
 
-    map.on('load', () => {
-      map.resize()
+    let didInitialFit = false
 
-      map.addSource('geoframe-clusters', {
-        type: 'geojson',
-        data: { type: 'FeatureCollection', features: [] },
-      })
+    const handleFeatureClick = (feature: MapFeature) => {
+      const coordinates = feature.geometry.coordinates
 
-      map.addLayer({
-        id: 'cluster-circles',
-        type: 'circle',
-        source: 'geoframe-clusters',
-        paint: {
-          'circle-color': [
-            'case',
-            ['get', 'cluster'],
-            '#5f7a4d',
-            '#7c975f',
-          ],
-          'circle-radius': [
-            'case',
-            ['get', 'cluster'],
-            ['min', 34, ['+', 16, ['*', ['get', 'pointCount'], 1.5]]],
-            9,
-          ],
-          'circle-stroke-width': 2,
-          'circle-stroke-color': '#10120f',
-        },
-      })
-
-      map.addLayer({
-        id: 'cluster-count',
-        type: 'symbol',
-        source: 'geoframe-clusters',
-        filter: ['==', ['get', 'cluster'], true],
-        layout: {
-          'text-field': ['to-string', ['get', 'pointCount']],
-          'text-size': 13,
-        },
-        paint: {
-          'text-color': '#ecf0e9',
-        },
-      })
-
-      const loadClusters = async () => {
-        try {
-          const zoom = Math.round(map.getZoom())
-          const data = await getMapClusters(zoom)
-          const source = map.getSource('geoframe-clusters') as maplibregl.GeoJSONSource
-          source.setData(data)
-          setGeoCount(data.features.reduce((sum, feature) => sum + feature.properties.pointCount, 0))
-          setError(null)
-          setLoaded(true)
-
-          if (data.features.length > 0 && map.getZoom() <= 4) {
-            const bounds = new maplibregl.LngLatBounds()
-            data.features.forEach((feature) => {
-              bounds.extend(feature.geometry.coordinates as [number, number])
-            })
-            map.fitBounds(bounds, { padding: 80, maxZoom: 10, duration: 0 })
-          }
-        } catch (err: unknown) {
-          const message = err instanceof Error ? err.message : 'Unknown map API error'
-          setError(message)
-        }
+      if (feature.properties.cluster) {
+        map.easeTo({
+          center: coordinates,
+          zoom: Math.min(map.getZoom() + 2, 16),
+        })
+        return
       }
 
+      const assetId = feature.properties.assetId
+      if (!assetId) {
+        return
+      }
+
+      void getAssetById(assetId)
+        .then((asset) => setSelectedAsset(asset))
+        .catch((err: unknown) => {
+          const message = err instanceof Error ? err.message : 'Could not open photo'
+          setError(message)
+        })
+    }
+
+    const loadClusters = async () => {
+      try {
+        const zoom = Math.round(map.getZoom())
+        const data = await getMapClusters(zoom)
+        markerManager.sync(map, data.features, handleFeatureClick)
+        setGeoCount(data.features.reduce((sum, feature) => sum + feature.properties.pointCount, 0))
+        setError(null)
+        setLoaded(true)
+
+        if (!didInitialFit && data.features.length > 0) {
+          didInitialFit = true
+          const bounds = new maplibregl.LngLatBounds()
+          data.features.forEach((feature) => {
+            bounds.extend(feature.geometry.coordinates)
+          })
+          map.fitBounds(bounds, { padding: 80, maxZoom: 10 })
+        }
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : 'Unknown map API error'
+        setError(message)
+      }
+    }
+
+    map.on('load', () => {
+      map.resize()
       void loadClusters()
       map.on('zoomend', () => {
         void loadClusters()
-      })
-
-      map.on('click', 'cluster-circles', (event: maplibregl.MapLayerMouseEvent) => {
-        const feature = event.features?.[0]
-        if (!feature) {
-          return
-        }
-        const props = feature.properties as MapFeatureProperties
-        const geometry = feature.geometry as { type: 'Point'; coordinates: [number, number] }
-        const coordinates = geometry.coordinates.slice() as [number, number]
-
-        if (props.cluster) {
-          map.easeTo({
-            center: coordinates,
-            zoom: Math.min(map.getZoom() + 2, 16),
-          })
-          return
-        }
-
-        popupRef.current?.remove()
-        const thumbnail = props.thumbnailUrl
-          ? `<img src="${props.thumbnailUrl}" alt="" class="map-popup-thumb" />`
-          : '<div class="map-popup-fallback">No preview</div>'
-
-        popupRef.current = new maplibregl.Popup({ offset: 16, maxWidth: '220px' })
-          .setLngLat(coordinates)
-          .setHTML(`<div class="map-popup">${thumbnail}<p>${props.pointCount} photo</p></div>`)
-          .addTo(map)
-      })
-
-      map.on('mouseenter', 'cluster-circles', () => {
-        map.getCanvas().style.cursor = 'pointer'
-      })
-      map.on('mouseleave', 'cluster-circles', () => {
-        map.getCanvas().style.cursor = ''
       })
     })
 
@@ -152,7 +108,7 @@ export const MapPage = ({ onNavigate }: MapPageProps) => {
     mapRef.current = map
     return () => {
       window.removeEventListener('resize', onResize)
-      popupRef.current?.remove()
+      markerManager.clear()
       map.remove()
       mapRef.current = null
     }
@@ -183,6 +139,17 @@ export const MapPage = ({ onNavigate }: MapPageProps) => {
       <div className="map-page">
         <div className="map-canvas" ref={containerRef} aria-label="Photo map" />
       </div>
+
+      {selectedAsset && (
+        <Lightbox
+          asset={selectedAsset}
+          hasPrev={false}
+          hasNext={false}
+          onClose={() => setSelectedAsset(null)}
+          onPrev={() => undefined}
+          onNext={() => undefined}
+        />
+      )}
     </AppShell>
   )
 }

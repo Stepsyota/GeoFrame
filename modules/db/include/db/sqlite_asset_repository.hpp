@@ -28,6 +28,10 @@ public:
     void set_status(std::int64_t id, core::AssetStatus status) override;
     std::vector<core::GeoAsset> list_geo_points(
         core::AssetStatus status = core::AssetStatus::Active) override;
+    std::vector<core::HashedAsset> list_hashed_assets(
+        core::AssetStatus status = core::AssetStatus::Active) override;
+    std::vector<core::TimedAsset> list_timed_assets(
+        core::AssetStatus status = core::AssetStatus::Active) override;
 
 private:
     Database& database;

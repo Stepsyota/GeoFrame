@@ -1,6 +1,8 @@
 #include "server/router.hpp"
 
+#include "core/duplicate_grouper.hpp"
 #include "core/map_clusterer.hpp"
+#include "core/series_detector.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -445,21 +447,37 @@ void Router::register_routes() {
                 properties["cluster"] = cluster.is_cluster;
                 properties["pointCount"] = cluster.asset_ids.size();
                 properties["assetIds"] = cluster.asset_ids;
+                properties["thumbnailUrl"] = nullptr;
+                properties["previewUrl"] = nullptr;
+                properties["assetId"] = nullptr;
+                properties["mediaType"] = nullptr;
+                properties["favorite"] = false;
 
-                if (!cluster.is_cluster && !cluster.asset_ids.empty()) {
-                    const auto asset = assets_.find_by_id(cluster.asset_ids.front());
-                    if (asset.has_value()) {
+                bool has_representative = false;
+                for (const auto asset_id : cluster.asset_ids) {
+                    const auto asset = assets_.find_by_id(asset_id);
+                    if (!asset.has_value()) {
+                        continue;
+                    }
+                    if (!has_representative) {
                         properties["assetId"] = asset->id;
                         properties["mediaType"] =
                             (asset->media_type == core::MediaType::Image) ? "image" : "video";
                         properties["favorite"] = asset->favorite;
-                        if (asset->thumbnail_path.has_value()) {
-                            properties["thumbnailUrl"] =
-                                media_url_with_version(asset->id, "thumbnail",
-                                                       *asset->thumbnail_path);
-                        } else {
-                            properties["thumbnailUrl"] = nullptr;
-                        }
+                        has_representative = true;
+                    }
+                    if (properties["thumbnailUrl"].is_null() &&
+                        asset->thumbnail_path.has_value()) {
+                        properties["thumbnailUrl"] = media_url_with_version(
+                            asset->id, "thumbnail", *asset->thumbnail_path);
+                    }
+                    if (properties["previewUrl"].is_null() && asset->preview_path.has_value()) {
+                        properties["previewUrl"] =
+                            media_url_with_version(asset->id, "preview", *asset->preview_path);
+                    }
+                    if (!properties["thumbnailUrl"].is_null() &&
+                        !properties["previewUrl"].is_null()) {
+                        break;
                     }
                 }
 
@@ -467,6 +485,82 @@ void Router::register_routes() {
                 body["features"].push_back(feature);
             }
 
+            return json_ok(body);
+        },
+    });
+
+    // ── GET /api/duplicates?status=active ───────────────────────────────────
+    routes_.push_back({
+        "GET",
+        {"api", "duplicates"},
+        [this](const HttpRequest& req, const std::vector<std::string>&) -> HttpResponse {
+            const auto params = parse_query(req.query);
+            const auto status_str =
+                params.count("status") ? params.at("status") : std::string{"active"};
+            const core::AssetStatus status =
+                (status_str == "trashed") ? core::AssetStatus::Trashed
+                                          : core::AssetStatus::Active;
+
+            const auto groups = core::group_duplicate_hashes(assets_.list_hashed_assets(status));
+
+            json body;
+            body["groups"] = json::array();
+            for (const auto& group : groups) {
+                json item;
+                item["sha256"] = group.sha256;
+                item["assetIds"] = group.asset_ids;
+                item["assets"] = json::array();
+                for (const auto asset_id : group.asset_ids) {
+                    const auto asset = assets_.find_by_id(asset_id);
+                    if (asset.has_value()) {
+                        item["assets"].push_back(asset_to_json(*asset));
+                    }
+                }
+                body["groups"].push_back(item);
+            }
+            body["total"] = groups.size();
+            return json_ok(body);
+        },
+    });
+
+    // ── GET /api/series?status=active&gap=3 ─────────────────────────────────
+    routes_.push_back({
+        "GET",
+        {"api", "series"},
+        [this](const HttpRequest& req, const std::vector<std::string>&) -> HttpResponse {
+            const auto params = parse_query(req.query);
+            const auto status_str =
+                params.count("status") ? params.at("status") : std::string{"active"};
+            const auto gap_str = params.count("gap") ? params.at("gap") : std::string{"3"};
+            const core::AssetStatus status =
+                (status_str == "trashed") ? core::AssetStatus::Trashed
+                                          : core::AssetStatus::Active;
+
+            int gap_seconds = 3;
+            std::from_chars(gap_str.data(), gap_str.data() + gap_str.size(), gap_seconds);
+            gap_seconds = std::clamp(gap_seconds, 1, 60);
+
+            const auto detected =
+                core::detect_photo_series(assets_.list_timed_assets(status), gap_seconds);
+
+            json body;
+            body["series"] = json::array();
+            std::int64_t series_id = 1;
+            for (const auto& entry : detected) {
+                json item;
+                item["id"] = series_id++;
+                item["assetIds"] = entry.asset_ids;
+                item["assets"] = json::array();
+                for (const auto asset_id : entry.asset_ids) {
+                    const auto asset = assets_.find_by_id(asset_id);
+                    if (asset.has_value()) {
+                        item["assets"].push_back(asset_to_json(*asset));
+                    }
+                }
+                body["series"].push_back(item);
+            }
+            body["total"] = detected.size();
+            body["gapSeconds"] = gap_seconds;
             return json_ok(body);
         },
     });

@@ -1,4 +1,7 @@
+import { demoAssetPage } from './assets'
 import type { MapClusterCollection } from '../types/map'
+
+const assetThumb = (id: number) => demoAssetPage.items.find((item) => item.id === id)?.thumbnailUrl ?? null
 
 export const demoMapClusters: MapClusterCollection = {
   type: 'FeatureCollection',
@@ -10,6 +13,11 @@ export const demoMapClusters: MapClusterCollection = {
         cluster: true,
         pointCount: 8,
         assetIds: [1, 2, 3, 4, 5, 6, 7, 8],
+        assetId: 1,
+        mediaType: 'image',
+        favorite: true,
+        thumbnailUrl: assetThumb(1),
+        previewUrl: assetThumb(1),
       },
     },
     {
@@ -22,7 +30,8 @@ export const demoMapClusters: MapClusterCollection = {
         assetId: 9,
         mediaType: 'image',
         favorite: true,
-        thumbnailUrl: null,
+        thumbnailUrl: assetThumb(9),
+        previewUrl: assetThumb(9),
       },
     },
     {
@@ -35,7 +44,8 @@ export const demoMapClusters: MapClusterCollection = {
         assetId: 10,
         mediaType: 'image',
         favorite: false,
-        thumbnailUrl: null,
+        thumbnailUrl: assetThumb(10),
+        previewUrl: assetThumb(10),
       },
     },
   ],

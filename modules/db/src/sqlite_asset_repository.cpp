@@ -327,6 +327,39 @@ void SqliteAssetRepository::set_status(const std::int64_t id, const core::AssetS
     }
 }
 
+std::vector<core::HashedAsset> SqliteAssetRepository::list_hashed_assets(
+    const core::AssetStatus status) {
+    auto statement = database.prepare(
+        "SELECT id, sha256 FROM assets WHERE status = ? AND sha256 IS NOT NULL ORDER BY id");
+    statement.bind(1, to_string(status));
+
+    std::vector<core::HashedAsset> assets;
+    while (statement.step()) {
+        assets.push_back(core::HashedAsset{
+            .id = statement.column_int64(0),
+            .sha256 = statement.column_text(1),
+        });
+    }
+    return assets;
+}
+
+std::vector<core::TimedAsset> SqliteAssetRepository::list_timed_assets(
+    const core::AssetStatus status) {
+    auto statement = database.prepare(
+        "SELECT id, captured_at FROM assets WHERE status = ? AND captured_at IS NOT NULL "
+        "ORDER BY captured_at, id");
+    statement.bind(1, to_string(status));
+
+    std::vector<core::TimedAsset> assets;
+    while (statement.step()) {
+        assets.push_back(core::TimedAsset{
+            .id = statement.column_int64(0),
+            .captured_at = statement.column_text(1),
+        });
+    }
+    return assets;
+}
+
 std::vector<core::GeoAsset> SqliteAssetRepository::list_geo_points(
     const core::AssetStatus status) {
     auto statement = database.prepare(

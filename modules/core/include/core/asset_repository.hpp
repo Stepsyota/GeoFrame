@@ -1,7 +1,9 @@
 #pragma once
 
 #include "core/asset.hpp"
+#include "core/duplicate_grouper.hpp"
 #include "core/geo_asset.hpp"
+#include "core/series_detector.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -33,6 +35,10 @@ public:
     virtual void set_favorite(std::int64_t id, bool favorite) = 0;
     virtual void set_status(std::int64_t id, AssetStatus status) = 0;
     virtual std::vector<GeoAsset> list_geo_points(AssetStatus status = AssetStatus::Active) = 0;
+    virtual std::vector<HashedAsset> list_hashed_assets(
+        AssetStatus status = AssetStatus::Active) = 0;
+    virtual std::vector<TimedAsset> list_timed_assets(
+        AssetStatus status = AssetStatus::Active) = 0;
 };
 
 }  // namespace geoframe::core

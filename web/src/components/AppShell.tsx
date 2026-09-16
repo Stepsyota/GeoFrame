@@ -1,4 +1,5 @@
 import {
+  Copy,
   GalleryHorizontalEnd,
   Heart,
   Images,
@@ -9,12 +10,13 @@ import {
 } from 'lucide-react'
 import type { PropsWithChildren, ReactNode } from 'react'
 
-export type AppPage = 'photos' | 'map' | 'series' | 'favorites'
+export type AppPage = 'photos' | 'map' | 'duplicates' | 'series' | 'favorites'
 
 const navigation: Array<{ id: AppPage; label: string; icon: typeof Images; enabled: boolean }> = [
   { id: 'photos', label: 'Photos', icon: Images, enabled: true },
   { id: 'map', label: 'Map', icon: Map, enabled: true },
-  { id: 'series', label: 'Series', icon: GalleryHorizontalEnd, enabled: false },
+  { id: 'duplicates', label: 'Duplicates', icon: Copy, enabled: true },
+  { id: 'series', label: 'Series', icon: GalleryHorizontalEnd, enabled: true },
   { id: 'favorites', label: 'Favorites', icon: Heart, enabled: false },
 ]
 

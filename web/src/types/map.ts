@@ -6,6 +6,7 @@ export interface MapFeatureProperties {
   mediaType?: 'image' | 'video'
   favorite?: boolean
   thumbnailUrl?: string | null
+  previewUrl?: string | null
 }
 
 export interface MapFeature {
