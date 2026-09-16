@@ -2,7 +2,9 @@
 
 #include "core/asset_repository.hpp"
 #include "core/config.hpp"
+#include "core/event_bus.hpp"
 #include "core/job_repository.hpp"
+#include "core/progress_tracker.hpp"
 
 #include <memory>
 
@@ -18,7 +20,9 @@ class HttpServer {
 public:
     HttpServer(const core::Config& config,
                core::IAssetRepository& assets,
-               core::IJobRepository& jobs);
+               core::IJobRepository& jobs,
+               core::EventBus& events,
+               core::ProgressTracker& progress);
     ~HttpServer();
 
     HttpServer(const HttpServer&) = delete;

@@ -61,7 +61,7 @@ Python-код не развиваем. Используем как reference п�
 #### Индексация
 
 - [x] Фоновая обработка; UI доступен сразу (WorkerPool запускается до HTTP server)
-- [ ] Прогресс сканирования (файлы, фото, видео, live photos, % metadata, % thumbnails)
+- [x] Прогресс сканирования (файлы, % metadata, % thumbnails — WebSocket `/ws/events`)
 - [x] Дата съёмки изображения из EXIF; если нет — `unknown` (не fallback на filesystem)
 - [x] SHA-256 каждого оригинала
 - [x] Нормализованные метаданные изображений и видео (Exiv2 / ffprobe)
@@ -187,8 +187,8 @@ GeoFrame читает source folder. Внешние изменения файл�
 7. **Video pipeline** — ffprobe metadata, ffmpeg poster frame, video DB fields ✅
 8. **HTTP API + CLI + TLS** — REST + Boost.Beast + self-signed cert + CLI subcommands ✅
 9. **React gallery** — каркас, demo mode, real API + pagination ✅
-10. **WebSocket progress** — live прогресс индексации (`/ws/events`) — следующий шаг
-11. **Map** — GeoJSON endpoint + MapLibre
+10. **WebSocket progress** — live прогресс индексации (`/ws/events`) ✅
+11. **Map** — GeoJSON endpoint + MapLibre — следующий шаг
 12. **Duplicates + series** — детекция + UI
 13. **Удалить Python-прототип**
 

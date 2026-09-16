@@ -46,6 +46,7 @@ add_library(
         src/server.cpp
         src/tls.cpp
         src/http_server.cpp
+        src/progress_broadcaster.cpp
         src/router.cpp
 )
 add_library(GeoFrame::server ALIAS geoframe_server)

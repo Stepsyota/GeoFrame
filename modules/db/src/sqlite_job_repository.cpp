@@ -154,6 +154,55 @@ int SqliteJobRepository::retry_failed() {
     return database.changes();
 }
 
+core::JobStats SqliteJobRepository::stats() {
+    auto statement = database.prepare(
+        "SELECT type, status, COUNT(*) FROM jobs GROUP BY type, status");
+
+    core::JobStats result;
+    while (statement.step()) {
+        const auto type = type_from_string(statement.column_text(0));
+        const auto status = status_from_string(statement.column_text(1));
+        const auto count = static_cast<std::size_t>(statement.column_int64(2));
+
+        core::JobTypeStats* bucket = nullptr;
+        switch (type) {
+        case core::JobType::Hash:
+            bucket = &result.hash;
+            break;
+        case core::JobType::Metadata:
+            bucket = &result.metadata;
+            break;
+        case core::JobType::VideoMetadata:
+            bucket = &result.video_metadata;
+            break;
+        case core::JobType::Thumbnail:
+            bucket = &result.thumbnail;
+            break;
+        case core::JobType::Preview:
+            bucket = &result.preview;
+            break;
+        default:
+            continue;
+        }
+
+        switch (status) {
+        case core::JobStatus::Pending:
+            bucket->pending += count;
+            break;
+        case core::JobStatus::Processing:
+            bucket->processing += count;
+            break;
+        case core::JobStatus::Done:
+            bucket->done += count;
+            break;
+        case core::JobStatus::Failed:
+            bucket->failed += count;
+            break;
+        }
+    }
+    return result;
+}
+
 void SqliteJobRepository::requeue(const std::int64_t asset_id, const core::JobType type) {
     auto statement = database.prepare(
         "UPDATE jobs SET status = 'pending', started_at = NULL, completed_at = NULL, "

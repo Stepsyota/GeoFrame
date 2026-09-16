@@ -1,6 +1,8 @@
 #include "cli/cli.hpp"
 
 #include "core/config.hpp"
+#include "core/event_bus.hpp"
+#include "core/progress_tracker.hpp"
 #include "core/version.hpp"
 #include "db/database.hpp"
 #include "db/migration_runner.hpp"
@@ -294,10 +296,14 @@ int cmd_serve(const Args& args) {
         }
     } thumbnail_router{asset_repo, image_thumb_handler, video_thumb_handler};
 
+    core::EventBus event_bus;
+    core::ProgressTracker progress;
+
     worker::JobDispatcher dispatcher{
         asset_repo, job_repo,
         {&hash_handler, &meta_handler, &video_meta_handler,
-         &thumbnail_router, &image_preview_handler}};
+         &thumbnail_router, &image_preview_handler},
+        &progress};
 
     const int thread_count = config.worker_threads > 0
         ? config.worker_threads
@@ -319,20 +325,26 @@ int cmd_serve(const Args& args) {
         spdlog::info("Re-queued {} stale preview jobs (thumbnail newer than preview)", stale_previews);
     }
 
-    // If source is configured, trigger an immediate scan
+    std::thread scan_thread;
     if (!config.source.empty() && std::filesystem::is_directory(config.source)) {
-        spdlog::info("Auto-scanning source: {}", config.source.string());
-        storage::DirectoryScanner scanner;
-        worker::ScanService scan_svc{scanner, asset_repo, job_repo};
-        const auto report = scan_svc.scan(config.source);
-        spdlog::info("Scan enqueued: {} new, {} existing, {} unsupported, {} errors",
-                     report.assets_created, report.already_indexed,
-                     report.unsupported, report.filesystem_errors);
+        scan_thread = std::thread([&config, &asset_repo, &job_repo, &progress]() {
+            spdlog::info("Auto-scanning source: {}", config.source.string());
+            storage::DirectoryScanner scanner;
+            worker::ScanService scan_svc{scanner, asset_repo, job_repo, &progress};
+            const auto report = scan_svc.scan(config.source);
+            spdlog::info("Scan enqueued: {} new, {} existing, {} unsupported, {} errors",
+                         report.assets_created, report.already_indexed,
+                         report.unsupported, report.filesystem_errors);
+        });
     }
 
     // Run HTTP server (blocking)
-    server::HttpServer http_server{config, asset_repo, job_repo};
+    server::HttpServer http_server{config, asset_repo, job_repo, event_bus, progress};
     http_server.run();
+
+    if (scan_thread.joinable()) {
+        scan_thread.join();
+    }
 
     pool.stop();
     return 0;

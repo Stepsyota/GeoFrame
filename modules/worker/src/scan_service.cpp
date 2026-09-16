@@ -10,14 +10,31 @@
 namespace geoframe::worker {
 
 ScanService::ScanService(const storage::DirectoryScanner& scanner, core::IAssetRepository& assets,
-                         core::IJobRepository& jobs)
-    : scanner(scanner), assets(assets), jobs(jobs) {}
+                         core::IJobRepository& jobs, core::ProgressTracker* progress_tracker)
+    : scanner(scanner), assets(assets), jobs(jobs), progress(progress_tracker) {}
 
 ScanReport ScanService::scan(const std::filesystem::path& root) {
     ScanReport report;
     const auto absolute_root = std::filesystem::absolute(root).lexically_normal();
 
+    struct ScanningGuard {
+        core::ProgressTracker* tracker;
+        ~ScanningGuard() {
+            if (tracker != nullptr) {
+                tracker->set_scanning(false);
+            }
+        }
+    } scanning_guard{progress};
+
+    if (progress != nullptr) {
+        progress->set_scanning(true);
+    }
+
     const auto summary = scanner.scan(absolute_root, [&](const std::filesystem::path& path) {
+        if (progress != nullptr) {
+            progress->increment_scan_files();
+            progress->set_current_file(path.filename().string());
+        }
         const auto media_type = storage::detect_media_type(path);
         if (!media_type.has_value()) {
             ++report.unsupported;

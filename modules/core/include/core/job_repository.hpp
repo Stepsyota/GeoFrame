@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/job.hpp"
+#include "core/job_stats.hpp"
 
 #include <cstdint>
 #include <optional>
@@ -25,6 +26,7 @@ public:
     virtual int retry_failed() = 0;
     /** Reset a done/failed job back to Pending, or insert if missing. */
     virtual void requeue(std::int64_t asset_id, JobType type) = 0;
+    virtual JobStats stats() = 0;
 };
 
 }  // namespace geoframe::core

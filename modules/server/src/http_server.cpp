@@ -1,5 +1,6 @@
 #include "server/http_server.hpp"
 
+#include "server/progress_broadcaster.hpp"
 #include "server/router.hpp"
 #include "server/tls.hpp"
 
@@ -53,6 +54,18 @@ std::string mime_type(const std::filesystem::path& path) {
     if (ext == ".json")                  return "application/json";
     if (ext == ".svg")                   return "image/svg+xml";
     return "application/octet-stream";
+}
+
+std::string request_path(const std::string_view target) {
+    const auto qpos = target.find('?');
+    if (qpos == std::string_view::npos) {
+        return std::string{target};
+    }
+    return std::string{target.substr(0, qpos)};
+}
+
+bool is_events_websocket(const http::request<http::string_body>& req) {
+    return ws::is_upgrade(req) && request_path(req.target()) == "/ws/events";
 }
 
 HttpRequest to_http_request(const http::request<http::string_body>& req) {
@@ -129,7 +142,43 @@ void write_json_response(Stream& stream,
 }
 
 template<typename Stream>
-void handle_http_session(Stream stream, const Router& router) {
+void handle_websocket_session(Stream stream, http::request<http::string_body> req,
+                            core::EventBus& events, ProgressBroadcaster& broadcaster) {
+    ws::stream<Stream> ws_stream{std::move(stream)};
+    ws_stream.set_option(ws::stream_base::timeout::suggested(beast::role_type::server));
+    ws_stream.accept(req);
+
+    std::mutex write_mutex;
+    const auto send_text = [&](const std::string& payload) {
+        std::lock_guard lock{write_mutex};
+        beast::error_code write_ec;
+        ws_stream.write(net::buffer(payload), write_ec);
+    };
+
+    send_text(broadcaster.snapshot_json());
+
+    const int subscription = events.subscribe([&](const std::string& payload) {
+        send_text(payload);
+    });
+
+    beast::flat_buffer buffer;
+    while (true) {
+        beast::error_code read_ec;
+        ws_stream.read(buffer, read_ec);
+        if (read_ec) {
+            break;
+        }
+        buffer.consume(buffer.size());
+    }
+
+    events.unsubscribe(subscription);
+    beast::error_code close_ec;
+    ws_stream.close(ws::close_code::normal, close_ec);
+}
+
+template<typename Stream>
+void handle_http_session(Stream stream, const Router& router, core::EventBus& events,
+                         ProgressBroadcaster& broadcaster) {
     beast::flat_buffer buffer;
 
     while (true) {
@@ -144,10 +193,15 @@ void handle_http_session(Stream stream, const Router& router) {
             break;
         }
 
+        if (is_events_websocket(req)) {
+            handle_websocket_session(std::move(stream), std::move(req), events, broadcaster);
+            return;
+        }
+
         if (ws::is_upgrade(req)) {
-            http::response<http::string_body> res{http::status::not_implemented, req.version()};
+            http::response<http::string_body> res{http::status::not_found, req.version()};
             res.set(http::field::content_type, "application/json");
-            res.body() = R"({"error":"WebSocket requires HTTPS"})";
+            res.body() = R"({"error":"Unknown WebSocket endpoint"})";
             res.keep_alive(false);
             res.prepare_payload();
             http::write(stream, res);
@@ -171,16 +225,18 @@ void handle_http_session(Stream stream, const Router& router) {
     }
 }
 
-void handle_plain_session(tcp::socket socket, const Router& router) {
+void handle_plain_session(tcp::socket socket, const Router& router, core::EventBus& events,
+                          ProgressBroadcaster& broadcaster) {
     beast::tcp_stream stream{std::move(socket)};
     stream.expires_after(std::chrono::seconds{30});
-    handle_http_session(std::move(stream), router);
+    handle_http_session(std::move(stream), router, events, broadcaster);
 
     beast::error_code ec;
     stream.socket().shutdown(tcp::socket::shutdown_send, ec);
 }
 
-void handle_tls_session(ssl::stream<tcp::socket> stream, const Router& router) {
+void handle_tls_session(ssl::stream<tcp::socket> stream, const Router& router,
+                        core::EventBus& events, ProgressBroadcaster& broadcaster) {
     beast::error_code ec;
     stream.handshake(ssl::stream_base::server, ec);
     if (ec) {
@@ -188,7 +244,7 @@ void handle_tls_session(ssl::stream<tcp::socket> stream, const Router& router) {
         return;
     }
 
-    handle_http_session(std::move(stream), router);
+    handle_http_session(std::move(stream), router, events, broadcaster);
     stream.shutdown(ec);
 }
 
@@ -200,27 +256,42 @@ struct HttpServer::Impl {
     const core::Config& config;
     core::IAssetRepository& assets;
     core::IJobRepository& jobs;
+    core::EventBus& events;
+    core::ProgressTracker& progress;
     Router router;
+    ProgressBroadcaster broadcaster;
 
     net::io_context io_ctx{1};
     ssl::context ssl_ctx{ssl::context::tlsv12_server};
     std::atomic<bool> running{false};
 
-    Impl(const core::Config& cfg, core::IAssetRepository& a, core::IJobRepository& j)
-        : config(cfg), assets(a), jobs(j), router(a, j, cfg) {}
+    Impl(const core::Config& cfg, core::IAssetRepository& a, core::IJobRepository& j,
+         core::EventBus& e, core::ProgressTracker& p)
+        : config(cfg),
+          assets(a),
+          jobs(j),
+          events(e),
+          progress(p),
+          router(a, j, cfg),
+          broadcaster(e, p, a, j) {}
 };
 
 // ── HttpServer ──────────────────────────────────────────────────────────────
 
 HttpServer::HttpServer(const core::Config& config,
                        core::IAssetRepository& assets,
-                       core::IJobRepository& jobs)
-    : impl_(std::make_unique<Impl>(config, assets, jobs)) {}
+                       core::IJobRepository& jobs,
+                       core::EventBus& events,
+                       core::ProgressTracker& progress)
+    : impl_(std::make_unique<Impl>(config, assets, jobs, events, progress)) {}
 
-HttpServer::~HttpServer() = default;
+HttpServer::~HttpServer() {
+    stop();
+}
 
 void HttpServer::run() {
     auto& impl = *impl_;
+    impl.broadcaster.start();
 
     if (!impl.config.skip_tls) {
         const auto certs_dir = impl.config.data_dir / "certs";
@@ -258,18 +329,19 @@ void HttpServer::run() {
 
         if (impl.config.skip_tls) {
             std::thread([sock = std::move(socket), &impl]() mutable {
-                handle_plain_session(std::move(sock), impl.router);
+                handle_plain_session(std::move(sock), impl.router, impl.events, impl.broadcaster);
             }).detach();
         } else {
             std::thread([sock = std::move(socket), &impl]() mutable {
                 ssl::stream<tcp::socket> stream{std::move(sock), impl.ssl_ctx};
-                handle_tls_session(std::move(stream), impl.router);
+                handle_tls_session(std::move(stream), impl.router, impl.events, impl.broadcaster);
             }).detach();
         }
     }
 }
 
 void HttpServer::stop() {
+    impl_->broadcaster.stop();
     impl_->running = false;
     try {
         net::io_context tmp;

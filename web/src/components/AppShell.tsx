@@ -7,7 +7,7 @@ import {
   Settings,
   Sparkles,
 } from 'lucide-react'
-import type { PropsWithChildren } from 'react'
+import type { PropsWithChildren, ReactNode } from 'react'
 
 const navigation = [
   { label: 'Photos', icon: Images, active: true },
@@ -18,9 +18,10 @@ const navigation = [
 
 interface AppShellProps extends PropsWithChildren {
   total?: number
+  banner?: ReactNode
 }
 
-export const AppShell = ({ children, total }: AppShellProps) => (
+export const AppShell = ({ children, total, banner }: AppShellProps) => (
   <div className="app-shell">
     <aside className="sidebar">
       <div className="brand">
@@ -58,6 +59,7 @@ export const AppShell = ({ children, total }: AppShellProps) => (
           </button>
         </div>
       </header>
+      {banner}
       {children}
     </main>
 

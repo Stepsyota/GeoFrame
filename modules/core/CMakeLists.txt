@@ -1,4 +1,10 @@
-add_library(geoframe_core STATIC src/version.cpp)
+add_library(
+    geoframe_core
+    STATIC
+        src/version.cpp
+        src/event_bus.cpp
+        src/progress_tracker.cpp
+)
 add_library(GeoFrame::core ALIAS geoframe_core)
 
 target_include_directories(

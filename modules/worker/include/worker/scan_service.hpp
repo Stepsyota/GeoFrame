@@ -2,6 +2,7 @@
 
 #include "core/asset_repository.hpp"
 #include "core/job_repository.hpp"
+#include "core/progress_tracker.hpp"
 #include "storage/directory_scanner.hpp"
 
 #include <cstddef>
@@ -23,7 +24,7 @@ struct ScanReport {
 class ScanService {
 public:
     ScanService(const storage::DirectoryScanner& scanner, core::IAssetRepository& assets,
-                core::IJobRepository& jobs);
+                core::IJobRepository& jobs, core::ProgressTracker* progress = nullptr);
 
     ScanReport scan(const std::filesystem::path& root);
 
@@ -31,6 +32,7 @@ private:
     const storage::DirectoryScanner& scanner;
     core::IAssetRepository& assets;
     core::IJobRepository& jobs;
+    core::ProgressTracker* progress;
 };
 
 }  // namespace geoframe::worker

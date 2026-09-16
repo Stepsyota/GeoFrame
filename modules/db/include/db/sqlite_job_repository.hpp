@@ -20,6 +20,7 @@ public:
     int recover_interrupted() override;
     int retry_failed() override;
     void requeue(std::int64_t asset_id, core::JobType type) override;
+    core::JobStats stats() override;
 
 private:
     Database& database;

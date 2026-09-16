@@ -4,7 +4,9 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { AppShell } from '../components/AppShell'
 import { Lightbox } from '../components/Lightbox'
 import { MediaCard } from '../components/MediaCard'
+import { ScanProgressBanner } from '../components/ScanProgressBanner'
 import { useAssets } from '../hooks/useAssets'
+import { useScanProgress } from '../hooks/useScanProgress'
 import type { AssetSummary } from '../types/asset'
 
 /** Returns a sortable "YYYY-MM-DD" string (or "unknown") for grouping. */
@@ -52,6 +54,7 @@ const GallerySkeleton = () => (
 
 export const GalleryPage = () => {
   const { items, total, loading, loadingMore, error, hasMore, loadMore } = useAssets()
+  const { progress, active: progressActive } = useScanProgress()
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const loadMoreRef = useRef<HTMLDivElement | null>(null)
 
@@ -92,7 +95,10 @@ export const GalleryPage = () => {
   }
 
   return (
-    <AppShell total={total}>
+    <AppShell
+      total={total}
+      banner={progressActive && progress ? <ScanProgressBanner progress={progress} /> : null}
+    >
       {loading && <GallerySkeleton />}
 
       {error && (
