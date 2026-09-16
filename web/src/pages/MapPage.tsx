@@ -2,6 +2,7 @@ import { AlertCircle, MapPin } from 'lucide-react'
 import * as maplibregl from 'maplibre-gl'
 import { useEffect, useRef, useState } from 'react'
 
+import '../maplibre_setup'
 import { getMapClusters } from '../api/map'
 import { AppShell, type AppPage } from '../components/AppShell'
 import type { MapFeatureProperties } from '../types/map'
@@ -38,6 +39,8 @@ export const MapPage = ({ onNavigate }: MapPageProps) => {
     map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right')
 
     map.on('load', () => {
+      map.resize()
+
       map.addSource('geoframe-clusters', {
         type: 'geojson',
         data: { type: 'FeatureCollection', features: [] },
@@ -73,7 +76,6 @@ export const MapPage = ({ onNavigate }: MapPageProps) => {
         layout: {
           'text-field': ['to-string', ['get', 'pointCount']],
           'text-size': 13,
-          'text-font': ['Open Sans Bold'],
         },
         paint: {
           'text-color': '#ecf0e9',
@@ -144,8 +146,12 @@ export const MapPage = ({ onNavigate }: MapPageProps) => {
       })
     })
 
+    const onResize = () => map.resize()
+    window.addEventListener('resize', onResize)
+
     mapRef.current = map
     return () => {
+      window.removeEventListener('resize', onResize)
       popupRef.current?.remove()
       map.remove()
       mapRef.current = null

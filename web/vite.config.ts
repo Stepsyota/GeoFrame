@@ -3,6 +3,10 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
+  optimizeDeps: {
+    // MapLibre v6 worker bundling fails during Vite pre-bundling.
+    exclude: ['maplibre-gl'],
+  },
   server: {
     host: true,
     proxy: {
