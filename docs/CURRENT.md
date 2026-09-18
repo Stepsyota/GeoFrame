@@ -77,6 +77,8 @@
 - [x] Избранное
 - [x] Удаление → Trash
 - [x] Карта с кластерами (GeoJSON endpoint + MapLibre)
+- [x] Гибридная офлайн-карта (PMTiles z0–N локально + онлайн Carto на близком зуме)
+- [x] CLI: `geoframe map download world` (extract из Protomaps planet, `--dry-run`, `--max-zoom`)
 
 #### Инструменты
 
@@ -105,7 +107,9 @@
 | Фильтры (страна, камера, …) | После базовой галереи |
 | Timeline-режим | Roadmap |
 | AI / семантический поиск | Не планируется в ближайшем будущем |
-| Reverse geocoding | Решить позже |
+| Reverse geocoding | Нужен для «докачки по стране» (см. раздел Карта ниже) |
+| Докачка карты по странам с фото | Следующий этап после world z14 |
+| z16–20 офлайн (вектор) | Нет в Protomaps; только свой билд или онлайн |
 | Timezone | Отложено |
 | RAW-форматы | Поддержка форматов — постепенно |
 | Video transcoding | Отдаём оригинал, надеемся на браузер |
@@ -171,6 +175,93 @@ Permanent delete  ✅ → отдельная операция + подтверж
 
 GeoFrame читает source folder. Внешние изменения файлов в MVP не отслеживаются.
 
+## Карта и офлайн-базис (актуальный план)
+
+Зафиксировано по итогам работы над картой (сентябрь 2026). Детали установки и `/tmp` — в [SETUP.md](SETUP.md).
+
+### Что уже реализовано
+
+| Компонент | Описание |
+|-----------|----------|
+| **Гибридный режим** | Локальный PMTiles до `localMaxZoom`, выше — Carto (raster CDN или MVT через прокси) |
+| **Один world-файл** | `<data-dir>/map/region.pmtiles` + `map/config.json` (`localMaxZoom`, `hybrid`) |
+| **Staging на диске** | Большие загрузки в `<data-dir>/tmp/` (не в `/tmp` tmpfs); override: `GEOFRAME_TMP_DIR` |
+| **HTTP Range** | Сервер отдаёт байтовые диапазоны PMTiles (MapLibre читает кусками) |
+| **CLI** | `geoframe map download world [--max-zoom N] [--dry-run]` |
+| **Источник** | Protomaps daily build (`build.protomaps.com/YYYYMMDD.pmtiles`), max **z15** в архиве |
+| **Маркеры** | Кластеризация по гео, анимации, обложка кластера — самое раннее фото по `capturedAt` |
+
+Текущая dev-копия: `local/map/region.pmtiles` ~**34 GB** (world **z0–13**).
+
+### Порядок действий (согласовано)
+
+1. **Сейчас:** докачать **мир до z14** (~**68 GB** итого, +34 GB к текущему файлу).
+   ```bash
+   geoframe map download world --data-dir ./local --max-zoom 14
+   ```
+2. **Потом:** докачивать **z15 по странам**, только если в стране есть хотя бы одно фото с GPS.
+   - Без сложной кластерной логики — единица = **страна (ISO)**.
+   - Для **России** (и других гигантов): не весь полигон страны, а **bbox всех фото в RU** + небольшой padding (одна формула, не DBSCAN).
+3. **z16–20 офлайн:** из Protomaps **не вытащить** — в planet-архиве нет слоёв выше z15. До появления своего пайплайна — **гибрид + онлайн Carto** на близком зуме.
+
+### Оценки размера (Protomaps, dry-run, сентябрь 2026)
+
+| Что | Размер |
+|-----|--------|
+| Мир z0–13 | ~34 GB (текущее) |
+| Мир z0–14 | ~**68 GB** |
+| Мир z0–15 | ~**128 GB** (официальный planet) |
+| Беларусь z14–15 | ~**1.0 GB** |
+| Грузия z14–15 | ~**230 MB** |
+| Россия, европ. часть z14–15 | ~**7 GB** |
+| Россия, западнее Урала z14–15 | ~**12 GB** |
+
+**z18–20 по стране** (оценка «если бы данные существовали», ~×4 объёма на каждый новый зум):
+
+| Страна | z14–15 | z14–18 (оценка) |
+|--------|--------|-----------------|
+| Беларусь | 1 GB | ~55 GB |
+| Грузия | 230 MB | ~13 GB |
+| Россия, евр. часть | 7 GB | ~400 GB |
+
+Вывод: страничная докачка на z14–15 **очень выгодна**; z18+ даже для одной страны — уже десятки–сотни GB и **недоступно** из текущего источника.
+
+### Целевая схема хранения (следующая итерация)
+
+```
+<data-dir>/map/
+  region.pmtiles          # мир z0–14 (или переименовать в world.pmtiles)
+  regions/
+    BY.pmtiles            # z14–15, только если есть фото в BY
+    GE.pmtiles
+    RU.pmtiles            # bbox по фото в России, не вся страна
+  manifest.json           # список стран, bbox, bytes, updatedAt
+```
+
+Триггер докачки: после scan + metadata jobs → новая страна в GPS → одна задача / `geoframe map sync-countries` (ещё не реализовано).
+
+### Ограничения и решения
+
+| Проблема | Решение |
+|----------|---------|
+| `/tmp` на Fedora = tmpfs (RAM) | Staging в `<data-dir>/tmp/`; для cmake: `TMPDIR=$PWD/.cache/tmp` |
+| Firefox OOM при карте | Упрощённый hybrid (один raster слой Carto), лимиты маркеров, без CSS transform на корне маркера |
+| Carto free tier | 5M tiles/мес; для редкого зума вне офлайна обычно хватает; attribution обязателен |
+| Определение страны по GPS | Natural Earth polygons (офлайн) или reverse geocoding — TBD |
+
+### Команды (шпаргалка)
+
+```bash
+# Оценка без записи (~1–2 мин)
+geoframe map download world --data-dir ./local --max-zoom 14 --dry-run
+
+# Полная загрузка мира z14
+geoframe map download world --data-dir ./local --max-zoom 14
+
+# Сборка с большим TMPDIR
+export TMPDIR="$PWD/.cache/tmp" && cmake --build build --target geoframe
+```
+
 ## Следующие шаги (порядок работ)
 
 1. **Документация** — vision, MVP, roadmap, architecture ✅
@@ -187,6 +278,10 @@ GeoFrame читает source folder. Внешние изменения файл�
 12. **Duplicates + series** — детекция + UI ✅
 13. **Удалить Python-прототип** ✅
 14. **Lightbox + избранное + trash + EXIF** ✅
+15. **Карта: hybrid PMTiles + маркеры + CLI download** ✅
+16. **Карта: world z14** — в работе (ручная загрузка)
+17. **Карта: `map sync-countries` + manifest + multi-PMTiles в UI** — следующий этап
+18. **Страна по GPS** — Natural Earth / reverse geocoding для авто-докачки
 
 ## Критерий готовности MVP
 
