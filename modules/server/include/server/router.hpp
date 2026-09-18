@@ -4,6 +4,7 @@
 #include "core/config.hpp"
 #include "core/job_repository.hpp"
 #include "core/progress_tracker.hpp"
+#include "server/map_tile_service.hpp"
 
 #include <atomic>
 #include <filesystem>
@@ -29,6 +30,7 @@ struct HttpResponse {
     std::string body;
     std::string redirect_location;          // for 302
     std::filesystem::path file_path;        // for file streaming
+    bool range_requests = false;            // enable HTTP Range for PMTiles
     bool keep_alive = true;
 };
 
@@ -63,6 +65,7 @@ private:
     core::IJobRepository& jobs_;
     const core::Config& config_;
     core::ProgressTracker& progress_;
+    mutable MapTileService map_tiles_;
     std::atomic<bool> scan_running_{false};
 };
 

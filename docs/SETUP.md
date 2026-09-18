@@ -98,8 +98,8 @@ cmake --build build --parallel
 
 ```bash
 ./build/apps/geoframe/geoframe serve \
-    --source /path/to/your/photos \
-    --data-dir ~/.local/share/geoframe \
+    --source ./Photos \
+    --data-dir ./local/share/geoframe \
     --port 8443
 ```
 
@@ -339,6 +339,9 @@ geoframe --help               — эта справка
 ```
 ~/.local/share/geoframe/         ← data dir (настраивается через --data-dir)
 ├── geoframe.db                  ← SQLite: все метаданные, jobs, статусы
+├── tmp/                         ← staging для больших загрузок (map download, .part)
+├── map/
+│   └── region.pmtiles           ← офлайн-карта (после `map download world`)
 ├── cache/
 │   ├── thumbnails/              ← сгенерированные уменьшенные копии (≤500px)
 │   └── previews/                ← preview-версии для web (≤2000px)
@@ -363,6 +366,27 @@ geoframe --help               — эта справка
 | `certs/server.crt` + `server.key` | При первом `serve` (TLS) |
 | `cache/thumbnails/` | По ходу обработки в worker pool |
 | `cache/previews/` | По ходу обработки в worker pool |
+
+---
+
+## Большие файлы и `/tmp`
+
+На Fedora `/tmp` часто — **tmpfs в RAM** (несколько ГБ). Не кладите туда карты и сборки:
+GeoFrame пишет staging-файлы в **`<data-dir>/tmp/`** (например `./local/tmp/region.pmtiles.part`).
+
+Переопределение (отдельный HDD):
+
+```bash
+export GEOFRAME_TMP_DIR=/mnt/HDD/geoframe-tmp
+./build/apps/geoframe/geoframe map download world --data-dir ./local
+```
+
+Для `cmake`/`npm` при нехватке места в `/tmp`:
+
+```bash
+export TMPDIR="$PWD/.cache/tmp"
+mkdir -p "$TMPDIR"
+```
 
 ---
 

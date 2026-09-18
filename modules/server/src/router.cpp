@@ -1,5 +1,7 @@
 #include "server/router.hpp"
 
+#include "server/map_tile_service.hpp"
+
 #include "core/duplicate_grouper.hpp"
 #include "core/map_clusterer.hpp"
 #include "core/series_detector.hpp"
@@ -286,7 +288,11 @@ Router::Router(core::IAssetRepository& assets,
                core::IJobRepository& jobs,
                const core::Config& config,
                core::ProgressTracker& progress)
-    : assets_(assets), jobs_(jobs), config_(config), progress_(progress) {
+    : assets_(assets),
+      jobs_(jobs),
+      config_(config),
+      progress_(progress),
+      map_tiles_(config.data_dir) {
     register_routes();
 }
 
@@ -614,6 +620,144 @@ void Router::register_routes() {
         },
     });
 
+    // ── GET /api/map/region.pmtiles ──────────────────────────────────────
+    routes_.push_back({
+        "GET",
+        {"api", "map", "region.pmtiles"},
+        [this](const HttpRequest&, const std::vector<std::string>&) -> HttpResponse {
+            if (!map_tiles_.has_region()) {
+                return json_error(404, "Map region file not installed");
+            }
+            return {.status = 200,
+                    .content_type = "application/vnd.pmtiles",
+                    .file_path = map_tiles_.region_path(),
+                    .range_requests = true};
+        },
+    });
+
+    // ── GET /api/map/tiles/{z}/{x}/{y}.mvt ───────────────────────────────
+    routes_.push_back({
+        "GET",
+        {"api", "map", "tiles", "{z}", "{x}", "{y}"},
+        [this](const HttpRequest&, const std::vector<std::string>& caps) -> HttpResponse {
+            const int z = std::stoi(caps[0]);
+            const int x = std::stoi(caps[1]);
+            const auto dot = caps[2].find('.');
+            const int y = std::stoi(dot == std::string::npos ? caps[2] : caps[2].substr(0, dot));
+
+            const auto path = map_tiles_.tile(z, x, y);
+            if (!path.has_value()) {
+                return json_error(404, "Map tile not found");
+            }
+            return {.status = 200,
+                    .content_type = "application/vnd.mapbox-vector-tile",
+                    .file_path = *path};
+        },
+    });
+
+    // ── GET /api/map/fonts/{fontstack}/{range}.pbf ────────────────────────
+    routes_.push_back({
+        "GET",
+        {"api", "map", "fonts", "{fontstack}", "{range}"},
+        [this](const HttpRequest&, const std::vector<std::string>& caps) -> HttpResponse {
+            const auto dot = caps[1].find('.');
+            const auto range =
+                dot == std::string::npos ? caps[1] : caps[1].substr(0, dot);
+            const auto path = map_tiles_.font(caps[0], range);
+            if (!path.has_value()) {
+                return json_error(404, "Font glyph range not found");
+            }
+            return {.status = 200, .content_type = "application/x-protobuf", .file_path = *path};
+        },
+    });
+
+    const auto serve_sprite = [this](const std::string& name) -> HttpResponse {
+        const auto path = map_tiles_.sprite(name);
+        if (!path.has_value()) {
+            return json_error(404, "Sprite asset not found");
+        }
+        const auto content_type = name.ends_with(".png") ? "image/png" : "application/json";
+        return {.status = 200, .content_type = content_type, .file_path = *path};
+    };
+
+    routes_.push_back({
+        "GET",
+        {"api", "map", "sprite.json"},
+        [serve_sprite](const HttpRequest&, const std::vector<std::string>&) -> HttpResponse {
+            return serve_sprite("sprite.json");
+        },
+    });
+    routes_.push_back({
+        "GET",
+        {"api", "map", "sprite.png"},
+        [serve_sprite](const HttpRequest&, const std::vector<std::string>&) -> HttpResponse {
+            return serve_sprite("sprite.png");
+        },
+    });
+
+    // ── GET /api/map/points ───────────────────────────────────────────────
+    routes_.push_back({
+        "GET",
+        {"api", "map", "points"},
+        [this](const HttpRequest& req, const std::vector<std::string>&) -> HttpResponse {
+            const auto params = parse_query(req.query);
+            const auto status_str =
+                params.count("status") ? params.at("status") : std::string{"active"};
+            const core::AssetStatus status =
+                (status_str == "trashed") ? core::AssetStatus::Trashed
+                                          : core::AssetStatus::Active;
+
+            const auto points = assets_.list_geo_points(status);
+
+            json body;
+            body["type"] = "FeatureCollection";
+            body["features"] = json::array();
+
+            for (const auto& point : points) {
+                const auto asset = assets_.find_by_id(point.id);
+                if (!asset.has_value()) {
+                    continue;
+                }
+
+                json properties;
+                properties["cluster"] = false;
+                properties["pointCount"] = 1;
+                properties["assetIds"] = json::array({point.id});
+                properties["assetId"] = point.id;
+                properties["mediaType"] =
+                    (point.media_type == core::MediaType::Image) ? "image" : "video";
+                properties["favorite"] = point.favorite;
+                if (asset->captured_at.has_value()) {
+                    const auto iso = exif_to_iso(*asset->captured_at);
+                    properties["capturedAt"] = iso.empty() ? nullptr : json(iso);
+                } else {
+                    properties["capturedAt"] = nullptr;
+                }
+                properties["thumbnailUrl"] = nullptr;
+                properties["previewUrl"] = nullptr;
+                if (asset->thumbnail_path.has_value()) {
+                    properties["thumbnailUrl"] =
+                        media_url_with_version(asset->id, "thumbnail", *asset->thumbnail_path);
+                }
+                if (asset->preview_path.has_value()) {
+                    properties["previewUrl"] =
+                        media_url_with_version(asset->id, "preview", *asset->preview_path);
+                }
+
+                json feature;
+                feature["type"] = "Feature";
+                feature["geometry"] = {
+                    {"type", "Point"},
+                    {"coordinates", json::array({point.longitude, point.latitude})},
+                };
+                feature["properties"] = properties;
+                body["features"].push_back(feature);
+            }
+
+            return json_ok(body);
+        },
+    });
+
     // ── GET /api/map/clusters?zoom=10 ─────────────────────────────────────
     routes_.push_back({
         "GET",
@@ -804,6 +948,21 @@ void Router::register_routes() {
                 static_cast<std::int64_t>(preview_bytes / (1024 * 1024));
             body["cache"]["totalMB"] =
                 static_cast<std::int64_t>((thumb_bytes + preview_bytes) / (1024 * 1024));
+
+            const bool has_region = map_tiles_.has_region();
+            const int offline_zoom = map_tiles_.offline_max_zoom();
+            body["map"]["regionPmtiles"] = has_region;
+            body["map"]["regionMB"] =
+                static_cast<std::int64_t>(map_tiles_.region_bytes() / (1024 * 1024));
+            body["map"]["localMaxZoom"] = offline_zoom;
+            body["map"]["remoteMaxZoom"] = MapTileService::kUpstreamMaxZoom;
+            if (!has_region) {
+                body["map"]["basemap"] = "carto";
+            } else if (offline_zoom >= 0 && offline_zoom < MapTileService::kUpstreamMaxZoom) {
+                body["map"]["basemap"] = "hybrid";
+            } else {
+                body["map"]["basemap"] = "pmtiles";
+            }
 
             if (!ec) {
                 body["disk"]["availableMB"] =

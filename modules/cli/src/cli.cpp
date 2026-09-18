@@ -10,6 +10,7 @@
 #include "db/sqlite_asset_repository.hpp"
 #include "db/sqlite_job_repository.hpp"
 #include "server/http_server.hpp"
+#include "server/map_tile_service.hpp"
 #include "storage/directory_scanner.hpp"
 #include "worker/hash_job_handler.hpp"
 #include "worker/job_dispatcher.hpp"
@@ -21,6 +22,7 @@
 
 #include <spdlog/spdlog.h>
 
+#include <chrono>
 #include <cstdlib>
 #include <filesystem>
 #include <iostream>
@@ -48,6 +50,9 @@ struct Args {
     bool skip_tls = false;
     bool help = false;
     bool version = false;
+    std::string map_download_url;
+    int map_max_zoom = server::MapTileService::kDefaultWorldMaxZoom;
+    bool map_dry_run = false;
 };
 
 void print_help() {
@@ -57,6 +62,7 @@ void print_help() {
         << "  geoframe serve [options]          Start HTTP server + background workers\n"
         << "  geoframe scan <source> [options]  Index a directory (enqueue jobs)\n"
         << "  geoframe status [options]         Show library statistics\n"
+        << "  geoframe map download <url|world> Download a PMTiles map (region or planet)\n"
         << "  geoframe --version\n"
         << "  geoframe --help\n\n"
         << "Options:\n"
@@ -66,7 +72,17 @@ void print_help() {
         << "  --host <addr>       Bind address (default: 0.0.0.0)\n"
         << "  --port <n>          HTTPS port (default: 8443)\n"
         << "  --threads <n>       Worker thread count (default: hardware_concurrency-1)\n"
-        << "  --skip-tls          Use plain HTTP (dev only, no TLS)\n";
+        << "  --skip-tls          Use plain HTTP (dev only, no TLS)\n"
+        << "  --max-zoom <n>      Offline zoom for 'world' (default: 13, ~15–20 GB)\n"
+        << "  --dry-run           Estimate download size only (no file written)\n"
+        << "\nMap download (hybrid world basemap):\n"
+        << "  geoframe map download world\n"
+        << "      Local world z0–13 (~15–20 GB), closer zoom loads from Carto via GeoFrame.\n"
+        << "      (pmtiles tool is auto-installed into <data-dir>/bin/ on first run)\n"
+        << "  geoframe map download world --dry-run       Show estimated size (~30–60 s)\n"
+        << "  geoframe map download world --max-zoom 12   Smaller offline archive (~4 GB)\n"
+        << "  geoframe map download world --max-zoom 14   Larger offline archive (~25–30 GB)\n"
+        << "  geoframe map download https://…/area.pmtiles  Custom region (fully offline)\n";
 }
 
 std::filesystem::path default_data_dir() {
@@ -105,6 +121,26 @@ Args parse_args(const int argc, char* argv[]) {
             if (v < 1 || v > 65535) throw std::runtime_error("Invalid port: " + std::to_string(v));
             args.port = static_cast<std::uint16_t>(v);
             continue;
+        }
+        if (a == "--max-zoom") {
+            args.map_max_zoom = std::stoi(std::string{next()});
+            continue;
+        }
+        if (a == "--dry-run") {
+            args.map_dry_run = true;
+            continue;
+        }
+
+        if (a == "map") {
+            if (i + 1 < argc && std::string_view{argv[i + 1]} == "download") {
+                args.command = "map-download";
+                ++i;
+                if (i + 1 < argc && argv[i + 1][0] != '-') {
+                    args.map_download_url = argv[++i];
+                }
+                continue;
+            }
+            throw std::runtime_error("Unknown map subcommand (try: geoframe map download world)");
         }
 
         if (a == "serve" || a == "scan" || a == "status") {
@@ -422,6 +458,68 @@ int cmd_status(const Args& args) {
     return 0;
 }
 
+int cmd_map_download(const Args& args) {
+    if (args.map_download_url.empty()) {
+        throw std::runtime_error("Missing target (geoframe map download world)");
+    }
+
+    const auto config = build_config(args);
+    std::filesystem::create_directories(config.data_dir);
+    server::MapTileService map_tiles{config.data_dir};
+
+    const auto started = std::chrono::steady_clock::now();
+
+    if (args.map_download_url == "world") {
+        const int max_zoom = std::clamp(args.map_max_zoom, 0, 14);
+
+        std::cout << "Hybrid world map → " << map_tiles.region_path() << '\n'
+                  << "Offline: zoom 0–" << max_zoom << " (one PMTiles file, not 350k requests)\n"
+                  << "Online:  zoom " << (max_zoom + 1) << "+ via GeoFrame → Carto CDN\n"
+                  << "Resolving planet source URL…\n" << std::flush;
+
+        const auto source = server::MapTileService::latest_protomaps_planet_url();
+        std::cout << "Planet source: " << source << '\n';
+
+        const auto log_output = [](const std::string_view text) {
+            std::cout << text << std::flush;
+        };
+
+        if (!map_tiles.extract_world_subset(source, max_zoom, log_output, args.map_dry_run)) {
+            throw std::runtime_error(args.map_dry_run ? "World map size estimate failed"
+                                                        : "World map extract failed");
+        }
+    } else {
+        std::cout << "Downloading map to " << map_tiles.region_path() << '\n'
+                  << "Source: " << args.map_download_url << '\n';
+
+        std::uint64_t last_reported = 0;
+        const auto ok = map_tiles.download_region(
+            args.map_download_url,
+            [&](const std::uint64_t downloaded, const std::uint64_t total) {
+                if (total == 0) {
+                    return;
+                }
+                const auto pct = (downloaded * 100) / total;
+                if (pct >= last_reported + 5 || downloaded == total) {
+                    last_reported = pct;
+                    std::cout << "  " << pct << "% (" << (downloaded / (1024 * 1024)) << " / "
+                              << (total / (1024 * 1024)) << " MB)\n";
+                }
+            });
+
+        if (!ok) {
+            throw std::runtime_error("Map region download failed");
+        }
+        map_tiles.save_region_config(15, false);
+    }
+
+    const auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(
+        std::chrono::steady_clock::now() - started);
+    std::cout << "Done in " << elapsed.count() << "s. Size: "
+              << (map_tiles.region_bytes() / (1024 * 1024)) << " MB\n";
+    return 0;
+}
+
 }  // namespace
 
 // ── Public entry point ─────────────────────────────────────────────────────
@@ -438,9 +536,10 @@ int run(const int argc, char* argv[]) {
             print_help();
             return 0;
         }
-        if (args.command == "serve")  return cmd_serve(args);
-        if (args.command == "scan")   return cmd_scan(args);
-        if (args.command == "status") return cmd_status(args);
+        if (args.command == "serve")        return cmd_serve(args);
+        if (args.command == "scan")         return cmd_scan(args);
+        if (args.command == "status")       return cmd_status(args);
+        if (args.command == "map-download") return cmd_map_download(args);
 
         std::cerr << "Unknown command: " << args.command << '\n';
         return 1;

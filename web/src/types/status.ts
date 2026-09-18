@@ -17,4 +17,11 @@ export interface LibraryStatus {
     availableMB: number
     totalMB: number
   }
+  map?: {
+    regionPmtiles: boolean
+    regionMB: number
+    localMaxZoom: number
+    remoteMaxZoom: number
+    basemap: 'hybrid' | 'pmtiles' | 'carto'
+  }
 }

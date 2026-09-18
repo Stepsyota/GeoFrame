@@ -68,3 +68,9 @@ target_link_libraries(
 geoframe_set_warnings(geoframe_worker_tests)
 
 gtest_discover_tests(geoframe_worker_tests)
+
+add_executable(geoframe_server_tests server/map_tile_service_test.cpp)
+target_link_libraries(geoframe_server_tests PRIVATE GeoFrame::server GTest::gtest_main)
+geoframe_set_warnings(geoframe_server_tests)
+
+gtest_discover_tests(geoframe_server_tests)

@@ -11,10 +11,13 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@protomaps/basemaps": "^5.7.2",
     "lucide-react": "^1.46.0",
     "maplibre-gl": "^6.10.0",
+    "pmtiles": "^4.5.0",
     "react": "^19.3.0",
-    "react-dom": "^19.3.0"
+    "react-dom": "^19.3.0",
+    "supercluster": "^9.1.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

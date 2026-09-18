@@ -2,18 +2,18 @@ import { AlertCircle, MapPin } from 'lucide-react'
 import * as maplibregl from 'maplibre-gl'
 import { useEffect, useRef, useState } from 'react'
 
-import '../maplibre_setup'
+import { ensurePmtilesProtocol } from '../maplibre_setup'
 import { getAssetById } from '../api/assets'
-import { getMapClusters } from '../api/map'
+import { getMapBasemap, getMapPoints } from '../api/map'
 import { AppShell, type AppPage } from '../components/AppShell'
 import { Lightbox } from '../components/Lightbox'
+import { MapClusterIndex } from '../map/cluster_index'
+import { MAP_CREATE_OPTIONS } from '../map/map_performance'
 import { PhotoMarkerManager } from '../map/photo_markers'
 import type { AssetSummary } from '../types/asset'
 import type { MapFeature } from '../types/map'
 
 import 'maplibre-gl/dist/maplibre-gl.css'
-
-const MAP_STYLE = 'https://demotiles.maplibre.org/style.json'
 
 interface MapPageProps {
   onNavigate: (page: AppPage) => void
@@ -22,6 +22,7 @@ interface MapPageProps {
 export const MapPage = ({ onNavigate }: MapPageProps) => {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
+  const clusterIndexRef = useRef(new MapClusterIndex())
   const markerManagerRef = useRef(new PhotoMarkerManager())
   const [error, setError] = useState<string | null>(null)
   const [geoCount, setGeoCount] = useState(0)
@@ -33,84 +34,171 @@ export const MapPage = ({ onNavigate }: MapPageProps) => {
       return
     }
 
+    let cancelled = false
+    let syncFrame = 0
+    let zoomSyncTimer: number | undefined
+    let onResize: (() => void) | null = null
+
     const markerManager = markerManagerRef.current
+    const clusterIndex = clusterIndexRef.current
 
-    const map = new maplibregl.Map({
-      container: containerRef.current,
-      style: MAP_STYLE,
-      center: [27.56, 53.9],
-      zoom: 4,
-      attributionControl: false,
-    })
-    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right')
-    map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right')
-
-    let didInitialFit = false
-
-    const handleFeatureClick = (feature: MapFeature) => {
-      const coordinates = feature.geometry.coordinates
-
-      if (feature.properties.cluster) {
-        map.easeTo({
-          center: coordinates,
-          zoom: Math.min(map.getZoom() + 2, 16),
-        })
+    const initMap = async () => {
+      const basemap = await getMapBasemap()
+      if (cancelled || !containerRef.current) {
         return
       }
 
-      const assetId = feature.properties.assetId
-      if (!assetId) {
-        return
+      if (basemap.kind === 'pmtiles' || basemap.kind === 'hybrid') {
+        ensurePmtilesProtocol()
       }
 
-      void getAssetById(assetId)
-        .then((asset) => setSelectedAsset(asset))
-        .catch((err: unknown) => {
-          const message = err instanceof Error ? err.message : 'Could not open photo'
-          setError(message)
-        })
-    }
+      const map = new maplibregl.Map({
+        container: containerRef.current,
+        style: basemap.kind === 'carto' ? basemap.styleUrl : basemap.style,
+        center: [27.56, 53.9],
+        zoom: 4,
+        pitch: 0,
+        bearing: 0,
+        maxPitch: 0,
+        pitchWithRotate: false,
+        dragRotate: false,
+        touchPitch: false,
+        ...MAP_CREATE_OPTIONS,
+        attributionControl: false,
+        cooperativeGestures: false,
+      })
+      map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right')
+      map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right')
 
-    const loadClusters = async () => {
-      try {
-        const zoom = Math.round(map.getZoom())
-        const data = await getMapClusters(zoom)
-        markerManager.sync(map, data.features, handleFeatureClick)
-        setGeoCount(data.features.reduce((sum, feature) => sum + feature.properties.pointCount, 0))
+      let didInitialFit = false
+      let pointsLoaded = false
+
+      const handleFeatureClick = (feature: MapFeature) => {
+        const coordinates = feature.geometry.coordinates
+
+        if (feature.properties.cluster) {
+          const clusterId = feature.properties.clusterId
+          const nextZoom = clusterId !== undefined
+            ? clusterIndex.expansionZoom(clusterId)
+            : Math.min(map.getZoom() + 2, 18)
+          map.easeTo({
+            center: coordinates,
+            zoom: nextZoom,
+            duration: 450,
+          })
+          return
+        }
+
+        const assetId = feature.properties.assetId
+        if (!assetId) {
+          return
+        }
+
+        void getAssetById(assetId)
+          .then((asset) => setSelectedAsset(asset))
+          .catch((err: unknown) => {
+            const message = err instanceof Error ? err.message : 'Could not open photo'
+            setError(message)
+          })
+      }
+
+      const syncMarkers = () => {
+        if (!pointsLoaded) {
+          return
+        }
+        const bounds = map.getBounds()
+        const bbox: [number, number, number, number] = [
+          bounds.getWest(),
+          bounds.getSouth(),
+          bounds.getEast(),
+          bounds.getNorth(),
+        ]
+        const zoom = map.getZoom()
+        const features = clusterIndex.query(bbox, zoom)
+        markerManager.sync(map, features, handleFeatureClick, zoom)
+      }
+
+      const scheduleSync = () => {
+        cancelAnimationFrame(syncFrame)
+        syncFrame = requestAnimationFrame(syncMarkers)
+      }
+
+      const scheduleZoomSync = () => {
+        if (zoomSyncTimer !== undefined) {
+          return
+        }
+        zoomSyncTimer = window.setTimeout(() => {
+          zoomSyncTimer = undefined
+          scheduleSync()
+        }, 100)
+      }
+
+      const applyPoints = (data: Awaited<ReturnType<typeof getMapPoints>>) => {
+        clusterIndex.load(data.features)
+        pointsLoaded = true
+        setGeoCount(clusterIndex.totalPoints())
         setError(null)
         setLoaded(true)
+        scheduleSync()
 
-        if (!didInitialFit && data.features.length > 0) {
+        if (!didInitialFit && data.features.length > 0 && map.isStyleLoaded()) {
           didInitialFit = true
           const bounds = new maplibregl.LngLatBounds()
           data.features.forEach((feature) => {
             bounds.extend(feature.geometry.coordinates)
           })
-          map.fitBounds(bounds, { padding: 80, maxZoom: 10 })
+          map.fitBounds(bounds, { padding: 80, maxZoom: 12, duration: 0 })
+        }
+      }
+
+      try {
+        const data = await getMapPoints()
+        if (!cancelled) {
+          applyPoints(data)
         }
       } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : 'Unknown map API error'
-        setError(message)
+        if (!cancelled) {
+          const message = err instanceof Error ? err.message : 'Unknown map API error'
+          setError(message)
+        }
       }
+
+      map.on('load', () => {
+        map.resize()
+        scheduleSync()
+      })
+      map.on('zoom', scheduleZoomSync)
+      map.on('moveend', scheduleSync)
+      map.on('error', (event) => {
+        const message = event.error?.message ?? 'Could not render map tiles'
+        setError(message)
+      })
+
+      onResize = () => map.resize()
+      window.addEventListener('resize', onResize)
+
+      mapRef.current = map
     }
 
-    map.on('load', () => {
-      map.resize()
-      void loadClusters()
-      map.on('zoomend', () => {
-        void loadClusters()
-      })
+    void initMap().catch((err: unknown) => {
+      const message = err instanceof Error ? err.message : 'Could not load map'
+      setError(message)
     })
 
-    const onResize = () => map.resize()
-    window.addEventListener('resize', onResize)
-
-    mapRef.current = map
     return () => {
-      window.removeEventListener('resize', onResize)
+      cancelled = true
+      if (zoomSyncTimer !== undefined) {
+        window.clearTimeout(zoomSyncTimer)
+      }
+      cancelAnimationFrame(syncFrame)
+      if (onResize) {
+        window.removeEventListener('resize', onResize)
+      }
       markerManager.clear()
-      map.remove()
-      mapRef.current = null
+      if (mapRef.current) {
+        mapRef.current.remove()
+        mapRef.current = null
+      }
     }
   }, [])
 

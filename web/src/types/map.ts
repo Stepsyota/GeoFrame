@@ -3,8 +3,10 @@ export interface MapFeatureProperties {
   pointCount: number
   assetIds: number[]
   assetId?: number
+  clusterId?: number
   mediaType?: 'image' | 'video'
   favorite?: boolean
+  capturedAt?: string | null
   thumbnailUrl?: string | null
   previewUrl?: string | null
 }

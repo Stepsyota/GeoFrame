@@ -1,5 +1,7 @@
 Photos/
 local/
+.cache/
+.tmp/
 
 # Frontend
 web/node_modules/
